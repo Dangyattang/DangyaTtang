@@ -35,7 +35,9 @@ def home():
     return render_template('index.html')
 
 #로그인
-
+@app.route('/login')
+def login():
+    return ""
 #회원가입
 
 #팀 주문 등록
