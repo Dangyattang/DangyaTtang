@@ -46,7 +46,7 @@ def login():
 
 #팀 주문 선택조회
 
-#테스트용용
+#테스트용2
 
 if __name__ == '__main__':
     app.run('0.0.0.0', port=5000, debug=True)
