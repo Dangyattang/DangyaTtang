@@ -11,6 +11,8 @@ import requests
 import os
 from dotenv import load_dotenv
 from functools import wraps
+import threading
+import time
 
 
 app = Flask(__name__)
@@ -61,35 +63,39 @@ def login_required(f):
 def create_access_token(user_id):
     return pyjwt.encode({
         "user_id": user_id,
-        "exp": datetime.utcnow() + timedelta(minutes=1)  # 30초초 후 만료
+        "exp": datetime.utcnow() + timedelta(minutes=10)  # 30초초 후 만료
     }, SECRET_KEY, algorithm="HS256")
 
 def create_refresh_token(user_id):
     return pyjwt.encode({
         "user_id": user_id,
-        "exp": datetime.utcnow() + timedelta(minutes=10)  # 1분 후 만료
+        "exp": datetime.utcnow() + timedelta(minutes=15)  # 1분 후 만료
     }, SECRET_KEY, algorithm="HS256")
 
 def get_user_from_token():
     access_token = request.cookies.get("access_token")
+    print(f"🔍 Access Token from Cookie: {access_token}")  # ✅ 추가 디버깅용 출력
 
     if access_token:
         try:
             decoded_token = pyjwt.decode(access_token, SECRET_KEY, algorithms=["HS256"])
             user_id = decoded_token.get("user_id")
+            print(f"✅ Decoded User ID: {user_id}")  # ✅ 추가 디버깅용 출력
             return db.users.find_one({"_id": ObjectId(user_id)})
-
         except pyjwt.ExpiredSignatureError:
+            print("[⚠️] Access Token expired. Checking Refresh Token...")  
             refresh_token = request.cookies.get("refresh_token")
             if refresh_token:
                 new_access_token = refresh_access_token(refresh_token)
                 if new_access_token:
-                    # ✅ 새로운 Access Token을 쿠키에 저장 (Response 반환 X)
+                    print(f"✅ New Access Token: {new_access_token}")  
                     response = make_response()
                     response.set_cookie("access_token", new_access_token, httponly=True, secure=False)
                     return db.users.find_one({"_id": ObjectId(pyjwt.decode(new_access_token, SECRET_KEY, algorithms=["HS256"])["user_id"])})
 
+    print("[ERROR] Failed to retrieve user from token")  
     return None
+
 
 
 def refresh_access_token(refresh_token):
@@ -146,12 +152,28 @@ def serialize_order(order):
         "food_category": order["food_category"],
         "menu_details": order["menu_details"]
     }
+
+
+def update_expired_orders():
+    """주기적으로 모집 종료된 주문을 'failed' 상태로 변경"""
+    while True:
+        now = datetime.now()
+        db.orders.update_many(
+            {"expires_at": {"$lt": now}, "status": "active"},
+            {"$set": {"status": "failed"}}
+        )
+        print("[INFO] 모집 종료된 주문 상태 업데이트 완료", datetime.now())
+        time.sleep(30)  # 30초마다 체크
+        
+
+# 백그라운드 스레드 시작
+threading.Thread(target=update_expired_orders, daemon=True).start()
     
 # 야식왕 선정
 def get_top_delivery_user():
     """참여 확정된 주문이 가장 많은 사용자 찾기 (동점자 처리 포함)"""
     users = list(db.users.find({}, {"name": 1, "past_orders": 1}))
-
+  
     if not users:
         return None  # 사용자가 없으면 None 반환
 
@@ -171,8 +193,6 @@ def get_top_delivery_user():
 def home():
     user = get_user_from_token()
     top_user = get_top_delivery_user()
-    if user:
-        return render_template('index.html', username=user["name"])
     return render_template('index.html', 
                            username=user["name"] if user else None, 
                            top_delivery_user=top_user)
@@ -201,8 +221,13 @@ def login_page():
             response.set_cookie("access_token", access_token, httponly=True, secure=False)
             response.set_cookie("refresh_token", refresh_token, httponly=True, secure=False)
 
+            print(f"✅ 로그인 성공: {username}, 유저 ID: {user['_id']}")
+            print(f"✅ 생성된 Access Token: {access_token}")
+            print(f"✅ 생성된 Refresh Token: {refresh_token}")
+            print(f"✅ 리디렉트 실행됨: {url_for('home')}")
             return response
         else:
+            print(f"❌ 로그인 실패: 아이디 또는 비밀번호 오류 - {username}")
             return render_template("login.html", error="로그인 실패! 아이디 또는 비밀번호를 확인하세요.")
     return render_template("login.html")
 
@@ -317,6 +342,10 @@ def create_Order():
 # 팀 주문 전체 조회 api
 @app.route('/orders')  
 def select_OrderList():
+    user = get_user_from_token()
+
+    user_id = str(user["_id"])
+
     orders = list(db.orders.find({"status": "active"}).sort("expires_at", -1))
     return jsonify([serialize_order(order) for order in orders])
 
@@ -325,9 +354,8 @@ def select_OrderList():
 def select_Orders_by_category():
     category = request.args.get("category")
     orders = list(db.orders.find(
-        {"food_category": category}).sort("expires_at", 1))
-    if len(orders) == 0:
-        return jsonify({"message": "해당 음식의 진행중인 주문이 없습니다"})
+        {"food_category": category, "status": "active"}).sort("expires_at", 1))
+    
     return jsonify([serialize_order(order) for order in orders])
 
 @app.route('/order/<string:order_id>', methods=["PUT"])  # 팀 주문 참여 신청 api
