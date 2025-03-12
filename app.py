@@ -150,7 +150,10 @@ def logout():
     response.delete_cookie("token")  # 쿠키에서 토큰 삭제
     return response
 
-
+# 개인 페이지
+@app.route("/personal")
+def personal_page():
+    return render_template("personal.html")
 
 # ===== 팀 주문 api =====
 
