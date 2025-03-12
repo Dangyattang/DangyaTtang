@@ -89,31 +89,7 @@
         const ordersContainer = $("#OrdersBox");
 
         // 페이지 로딩 시 팀 주문 전체 조회
-        $.ajax({
-          type: "GET",
-          url: `${API_BASE_URL}/orders`,
-          dataType: "json",
-          success: function (data) {
-            console.log(data, "전체 조회 성공");
-
-            // 기존 카드 삭제 후 새로 추가
-            ordersContainer.empty();
-
-            for (let order of data) {
-              makeOrder(
-                order._id,
-                order.food_category,
-                order.menu_details,
-                order.expires_at,
-                order.participants,
-                order.max_participants
-              );
-            }
-          },
-          error: function (error) {
-            console.error("에러 발생:", error);
-          },
-        });
+        showOrders();
 
         // 모달 열기
         $("[data-modal-toggle='crud-modal']").on("click", function () {
@@ -132,7 +108,7 @@
           e.preventDefault();
           const kakaoUrl = $("#kakaoURL").val();
           const limitTime = $("#limitTime").val();
-          const maxParticipants = $("#person").val();
+          const maxParticipants = $("#maxPerson").val();
           const selectedButtons = buttonContainer.find("button");
           const foodCategory = selectedButtons
             .map(function () {
@@ -140,6 +116,11 @@
             })
             .get();
           const detailMenu = $("#detailMenu").val();
+
+          if (maxParticipants > 10) {
+            alert("10명 이상은 추가할 수 없습니다 ❌");
+            return;
+          }
 
           $.ajax({
             type: "POST",
@@ -154,7 +135,9 @@
             }),
             success: function (data) {
               alert(data.message);
+
               modal.addClass("hidden").removeClass("flex");
+              showOrders();
             },
             error: function (error) {
               console.error("에러 발생:", error);
@@ -253,9 +236,8 @@
           const currentTime = new Date();
           const expiresTime = new Date(expires_at); // ISO 8601 형식 변환
           const timeDiff = Math.floor((expiresTime - currentTime) / 60000); // 밀리초 -> 분 변환
-
           let timeDisplay =
-            timeDiff > 0 ? `팀 주문 모집 ${timeDiff}분 전` : "모집 종료";
+            timeDiff > 0 ? `팀 주문 모집 마감 ${timeDiff}분 전` : "모집 종료";
 
           let tempHtml = `
             <div id="${orderid}" class="group bg-white dark:bg-[#1E2028] rounded-md overflow-hidden border border-gray-100 dark:border-gray-800 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors">
@@ -274,6 +256,34 @@
               </div>
             </div>`;
           $("#OrdersBox").append(tempHtml);
+        }
+
+        function showOrders() {
+          $.ajax({
+            type: "GET",
+            url: `${API_BASE_URL}/orders`,
+            dataType: "json",
+            success: function (data) {
+              console.log(data, "전체 조회 성공");
+
+              // 기존 카드 삭제 후 새로 추가
+              ordersContainer.empty();
+
+              for (let order of data) {
+                makeOrder(
+                  order._id,
+                  order.food_category,
+                  order.menu_details,
+                  order.expires_at,
+                  order.participants,
+                  order.max_participants
+                );
+              }
+            },
+            error: function (error) {
+              console.error("에러 발생:", error);
+            },
+          });
         }
       });
     </script>
@@ -320,7 +330,7 @@
       >
         {% if username %}
         <div class="text-center mb-4">
-          <p>안녕하세요, {{ username }}님!</p>
+          <a href="{{ url_for('personal') }}">안녕하세요, {{ username }}님!</a>
           <a href="{{ url_for('logout') }}" class="text-red-500 hover:underline"
             >로그아웃</a
           >
@@ -345,51 +355,92 @@
     <div class="wrap">
       <!-- ✅ 이달의 야식왕 (독립된 섹션) -->
       <div class="text-center text-lg font-bold mb-6">
-          {% if top_delivery_user %}
-              <p class="text-2xl">🏆 이달의 야식왕 <span class="text-red-500">'{{ top_delivery_user }}'</span>님! 🎉</p>
-          {% else %}
-              <p class="text-gray-600">아직 야식왕이 없습니다! 첫 번째 야식왕이 되어보세요!</p>
-          {% endif %}
+        {% if top_delivery_user %}
+        <p class="text-2xl">
+          🏆 이달의 야식왕
+          <span class="text-red-500">'{{ top_delivery_user }}'</span>님! 🎉
+        </p>
+        {% else %}
+        <p class="text-gray-600">
+          아직 야식왕이 없습니다! 첫 번째 야식왕이 되어보세요!
+        </p>
+        {% endif %}
       </div>
-  
+
       <!-- ✅ 음식 카테고리 필터 (별도 섹션) -->
-      <div class="btngroup flex items-center justify-center rounded-md shadow-xs"
-           role="group"
-           style="width: 800px; margin: 0 auto">
-          <button type="button" value="치킨" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 rounded-s-lg hover:bg-gray-900 hover:text-white">
-              치킨
-          </button>
-          <button type="button" value="피자" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white">
-              피자
-          </button>
-          <button type="button" value="중식" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white">
-              중식
-          </button>
-          <button type="button" value="일식" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white">
-              일식
-          </button>
-          <button type="button" value="양식" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white">
-              양식
-          </button>
-          <button type="button" value="분식" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white">
-              분식
-          </button>
-          <button type="button" value="탕,찌개" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white">
-              탕,찌개
-          </button>
-          <button type="button" value="고기" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white">
-              고기
-          </button>
-          <button type="button" value="디저트" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 rounded-e-lg hover:bg-gray-900 hover:text-white">
-              디저트
-          </button>
+      <div
+        class="btngroup flex items-center justify-center rounded-md shadow-xs"
+        role="group"
+        style="width: 800px; margin: 0 auto"
+      >
+        <button
+          type="button"
+          value="치킨"
+          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 rounded-s-lg hover:bg-gray-900 hover:text-white"
+        >
+          치킨
+        </button>
+        <button
+          type="button"
+          value="피자"
+          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white"
+        >
+          피자
+        </button>
+        <button
+          type="button"
+          value="중식"
+          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white"
+        >
+          중식
+        </button>
+        <button
+          type="button"
+          value="일식"
+          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white"
+        >
+          일식
+        </button>
+        <button
+          type="button"
+          value="양식"
+          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white"
+        >
+          양식
+        </button>
+        <button
+          type="button"
+          value="분식"
+          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white"
+        >
+          분식
+        </button>
+        <button
+          type="button"
+          value="탕,찌개"
+          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white"
+        >
+          탕,찌개
+        </button>
+        <button
+          type="button"
+          value="고기"
+          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white"
+        >
+          고기
+        </button>
+        <button
+          type="button"
+          value="디저트"
+          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 rounded-e-lg hover:bg-gray-900 hover:text-white"
+        >
+          디저트
+        </button>
       </div>
-  
+
       <br />
       <span class="gasoek-one-regular text-center text-3xl">팀 주문</span>
-
-
-  </div>
+    </div>
 
     <!-- Minimal Blog Cards Grid -->
     <div class="max-w-7xl w-full mx-auto p-4" style="max-width: 800px">
@@ -520,17 +571,19 @@
 
               <div class="col-span-2 sm:col-span-1">
                 <label
-                  for="price"
+                  for="maxPerson"
                   class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
                   >인원수</label
                 >
                 <input
                   type="number"
-                  name="price"
-                  id="person"
+                  name="maxPerson"
+                  id="maxPerson"
                   class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
                   placeholder="0"
                   required=""
+                  min="2"
+                  max="10"
                 />
               </div>
 
@@ -610,49 +663,59 @@
 
 <script>
   async function checkTokenStatus() {
-      const cookies = document.cookie.split('; ').reduce((acc, cookie) => {
-          const [name, value] = cookie.split('=');
-          acc[name] = value;
-          return acc;
-      }, {});
-  
-      const now = Date.now();
-  
-      // ✅ Access Token 만료 임박 시 자동 갱신
-      if (cookies["access_token"]) {
-          const tokenPayload = JSON.parse(atob(cookies["access_token"].split('.')[1]));
-          const exp = tokenPayload.exp * 1000;
-  
-          if (exp - now < 5000) {  // 🔥 5초 이하로 남으면 자동 갱신
-              console.log("[DEBUG] Access Token 만료 임박, Refresh Token 요청");
-              await fetch('/refresh-token', { method: 'POST', credentials: 'include' })
-                  .then(response => response.json())
-                  .then(data => {
-                      if (data.access_token) {
-                          console.log("[DEBUG] 새로운 Access Token 발급 완료");
-                          document.cookie = `access_token=${data.access_token}; path=/; HttpOnly`;
-                      } else {
-                          console.error("[ERROR] Access Token 갱신 실패");
-                      }
-                  })
-                  .catch(error => console.error("[ERROR] Refresh Token 요청 실패:", error));
-          }
+    const cookies = document.cookie.split("; ").reduce((acc, cookie) => {
+      const [name, value] = cookie.split("=");
+      acc[name] = value;
+      return acc;
+    }, {});
+
+    const now = Date.now();
+
+    // ✅ Access Token 만료 임박 시 자동 갱신
+    if (cookies["access_token"]) {
+      const tokenPayload = JSON.parse(
+        atob(cookies["access_token"].split(".")[1])
+      );
+      const exp = tokenPayload.exp * 1000;
+
+      if (exp - now < 5000) {
+        // 🔥 5초 이하로 남으면 자동 갱신
+        console.log("[DEBUG] Access Token 만료 임박, Refresh Token 요청");
+        await fetch("/refresh-token", {
+          method: "POST",
+          credentials: "include",
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.access_token) {
+              console.log("[DEBUG] 새로운 Access Token 발급 완료");
+              document.cookie = `access_token=${data.access_token}; path=/; HttpOnly`;
+            } else {
+              console.error("[ERROR] Access Token 갱신 실패");
+            }
+          })
+          .catch(error =>
+            console.error("[ERROR] Refresh Token 요청 실패:", error)
+          );
       }
-  
-      // ✅ Refresh Token 만료 시 자동 로그아웃
-      if (cookies["refresh_token"]) {
-          const refreshPayload = JSON.parse(atob(cookies["refresh_token"].split('.')[1]));
-          const refreshExp = refreshPayload.exp * 1000;
-  
-          if (refreshExp < now) {
-              console.log("[DEBUG] Refresh Token 만료됨, 자동 로그아웃 실행");
-              await fetch('/logout', { method: 'GET', credentials: 'include' })
-                  .then(() => window.location.href = "/login");
-          }
+    }
+
+    // ✅ Refresh Token 만료 시 자동 로그아웃
+    if (cookies["refresh_token"]) {
+      const refreshPayload = JSON.parse(
+        atob(cookies["refresh_token"].split(".")[1])
+      );
+      const refreshExp = refreshPayload.exp * 1000;
+
+      if (refreshExp < now) {
+        console.log("[DEBUG] Refresh Token 만료됨, 자동 로그아웃 실행");
+        await fetch("/logout", { method: "GET", credentials: "include" }).then(
+          () => (window.location.href = "/login")
+        );
       }
+    }
   }
-  
+
   // 🔥 10초마다 Access Token & Refresh Token 상태 확인
   setInterval(checkTokenStatus, 10000);
-  </script>
-  
+</script>
