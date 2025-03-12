@@ -108,7 +108,7 @@
           e.preventDefault();
           const kakaoUrl = $("#kakaoURL").val();
           const limitTime = $("#limitTime").val();
-          const maxParticipants = $("#person").val();
+          const maxParticipants = $("#maxPerson").val();
           const selectedButtons = buttonContainer.find("button");
           const foodCategory = selectedButtons
             .map(function () {
@@ -116,6 +116,11 @@
             })
             .get();
           const detailMenu = $("#detailMenu").val();
+
+          if (maxParticipants > 10) {
+            alert("10명 이상은 추가할 수 없습니다 ❌");
+            return;
+          }
 
           $.ajax({
             type: "POST",
@@ -233,7 +238,6 @@
           const timeDiff = Math.floor((expiresTime - currentTime) / 60000); // 밀리초 -> 분 변환
           let timeDisplay =
             timeDiff > 0 ? `팀 주문 모집 마감 ${timeDiff}분 전` : "모집 종료";
-          console.log(timeDiff);
 
           let tempHtml = `
             <div id="${orderid}" class="group bg-white dark:bg-[#1E2028] rounded-md overflow-hidden border border-gray-100 dark:border-gray-800 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors">
@@ -559,17 +563,19 @@
 
               <div class="col-span-2 sm:col-span-1">
                 <label
-                  for="price"
+                  for="maxPerson"
                   class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
                   >인원수</label
                 >
                 <input
                   type="number"
-                  name="price"
-                  id="person"
+                  name="maxPerson"
+                  id="maxPerson"
                   class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
                   placeholder="0"
                   required=""
+                  min="2"
+                  max="10"
                 />
               </div>
 
