@@ -254,6 +254,11 @@ def logout():
     response.delete_cookie("refresh_token")  # Refresh Token 삭제
     return response
 
+# 개인 페이지
+@app.route("/personal")
+def personal_page():
+    return render_template("personal.html")
+
 # Refresh Token을 사용하여 Access Token 갱신
 @app.route("/refresh-token", methods=["POST"])
 def refresh_token():
@@ -301,14 +306,15 @@ def select_CurrentOrder():
 
 # ===== 팀 주문 api =====
 
-# 팀 주문 등록 api
+
+# 팀 주문 등록 api,
 @app.route('/order', methods=["POST"])  
 def create_Order():
     data = request.json
     minute = int(data["limitTime_give"])
     new_order = {
-        "created_at": datetime.now(timezone.utc),
-        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=minute),
+        "created_at": datetime.now(),
+        "expires_at": datetime.now() + timedelta(minutes=minute),
         "host": ObjectId("67d0254ba0c0fb9bdffbc2e6"),
         "participants": [],
         "max_participants": data["maxPerson_give"],
@@ -325,7 +331,7 @@ def create_Order():
 # 팀 주문 전체 조회 api
 @app.route('/orders')  
 def select_OrderList():
-    orders = list(db.orders.find({"status": "active"}).sort("expires_at", 1))
+    orders = list(db.orders.find({"status": "active"}).sort("expires_at", -1))
     return jsonify([serialize_order(order) for order in orders])
 
 # 카테고리별 정렬 api
@@ -339,33 +345,57 @@ def select_Orders_by_category():
     return jsonify([serialize_order(order) for order in orders])
 
 @app.route('/order/<string:order_id>', methods=["PUT"])  # 팀 주문 참여 신청 api
+@login_required
 def insert_participation_in_orders(order_id):
-    data = request.get_json()
-    findusername = data["userId_give"]
-
-    # 현재 로그인 유저의 username으로 db에서 해당 유저의 _id값 추출
-    user = db.users.find_one({"username": findusername}, {"_id": 1})
-
+    userid = g.user_id
+    
+    # ✅ 유저 정보 조회
+    user = db.users.find_one({"_id": ObjectId(userid)}, {"name": 1, "active_order": 1})
     if not user:
         return jsonify({"message": "유저를 찾을 수 없습니다."}), 404
 
     user_object_id = user["_id"]
+    
+    
+   # ✅ 사용자가 이미 참여 중인 모집이 있는지 확인
+    if user.get("active_order"):
+        active_order = db.orders.find_one({"_id": ObjectId(user["active_order"])}, {"status": 1})
+        
+        # ✅ 모집이 확정되었다면 다른 주문 신청 불가
+        if active_order and active_order["status"] == "confirmed":
+            return jsonify({"message": "참여 중인 모집이 확정되어 새로운 참여 신청이 불가능합니다."}), 400
+        
+        # ✅ 모집이 실패되었다면 새로운 참여 가능 (기존 active_order 초기화)
+        elif active_order and active_order["status"] == "failed":
+            db.users.update_one({"_id": ObjectId(userid)}, {"$unset": {"active_order": ""}})
 
-    order = db.orders.find_one({"order_id": order_id})
-
+    # ✅ 주문 정보 조회
+    order = db.orders.find_one({"_id": ObjectId(order_id)}, {"participants": 1, "max_participants": 1, "status": 1})
     if not order:
         return jsonify({"message": "주문을 찾을 수 없습니다."}), 404
 
-   # 🔹 이미 참가한 유저인지 확인
-    if user_object_id in order["members"]:
-        return jsonify({"message": "이미 참가한 유저입니다."}), 400
+    # ✅ 이미 참여한 주문인지 확인
+    if user_object_id in order.get("participants", []):
+        return jsonify({"message": "이미 신청한 주문입니다."}), 400
 
+    # ✅ 주문이 확정된 상태라면 신청 불가
+    if order["status"] == "confirmed":
+        return jsonify({"message": "해당 주문은 이미 확정되었습니다."}), 400
+    
 # 🔹 참가자 목록 업데이트 (ObjectId 저장)
-    updated_order = db.orders.update_one(
-        {"order_id": order_id},
-        {"$push": {"participants": user_object_id}}
+    db.orders.update_one(
+        {"_id": ObjectId(order_id)},
+        {"$push": {"participants": user_object_id}},
     )
-    return jsonify({"message": f"{findusername}님이 주문에 참여했습니다!", "order": updated_order})
+    
+    # ✅ 유저의 active_order를 현재 주문 ID로 업데이트
+    db.users.update_one(
+        {"_id": ObjectId(userid)},
+        {"$set": {"active_order": ObjectId(order_id)}}
+    )
+    
+    print("✅ 업데이트 완료")
+    return jsonify({"message": f"{user['name']}님이 주문에 참여했습니다!"}), 200
 
 
 
