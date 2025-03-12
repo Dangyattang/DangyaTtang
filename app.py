@@ -2,8 +2,10 @@ from flask import Flask, render_template, request, redirect, url_for, make_respo
 from werkzeug.security import generate_password_hash, check_password_hash
 from pymongo import MongoClient
 import jwt as pyjwt
-import datetime
+from datetime import datetime, timedelta, timezone
 from bson.objectid import ObjectId  # ObjectId 추가
+from flask.json.provider import JSONProvider
+import json
 import re
 import requests
 import os
@@ -15,7 +17,7 @@ app = Flask(__name__)
 
 # MongoDB 연결
 client = MongoClient("mongodb://localhost:27017/")
-db = client["team_order_db"]
+db = client["dangyattang"]
 
 # 비밀키 로드
 load_dotenv()
@@ -111,6 +113,39 @@ def clear_tokens():
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
     return response
+
+# ObjectId 인코딩 처리 함수
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, ObjectId):
+            return str(o)
+        return json.JSONEncoder.default(self, o)
+
+class CustomJSONProvider(JSONProvider):
+    def dumps(self, obj, **kwargs):
+        return json.dumps(obj, **kwargs, cls=CustomJSONEncoder)
+
+    def loads(self, s, **kwargs):
+        return json.loads(s, **kwargs)
+
+
+app.json = CustomJSONProvider(app)
+
+# JSON 변환을 위한 함수
+def serialize_order(order):
+    return {
+        "_id": str(order["_id"]),
+        "created_at": order["created_at"].isoformat(),
+        "expires_at": order["expires_at"].isoformat(),
+        "host": str(order["host"]),
+        "participants": [str(p) for p in order["participants"]],
+        "max_participants": order["max_participants"],
+        "current_participants": order["current_participants"],
+        "status": order["status"],
+        "open_chat_url": order["open_chat_url"],
+        "food_category": order["food_category"],
+        "menu_details": order["menu_details"]
+    }
 
 # 홈 페이지
 @app.route('/')
@@ -227,6 +262,77 @@ def refresh_token():
         return response
     except pyjwt.ExpiredSignatureError:
         return clear_tokens()
+
+
+# ===== 팀 주문 api =====
+
+# 팀 주문 등록 api
+@app.route('/order', methods=["POST"])  
+def create_Order():
+    data = request.json
+    minute = int(data["limitTime_give"])
+    new_order = {
+        "created_at": datetime.now(timezone.utc),
+        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=minute),
+        "host": ObjectId("67d0254ba0c0fb9bdffbc2e6"),
+        "participants": [],
+        "max_participants": data["maxPerson_give"],
+        "current_participants": 0,
+        "status": "active",
+        "open_chat_url": data["kakaoUrl_give"],
+        "food_category": data["foodCategory_give"],
+        "menu_details": data["detailMenu_give"]
+    }
+    order_id = db.orders.insert_one(new_order).inserted_id
+
+    return jsonify({"message": "주문 생성 완료", "order_id": str(order_id)}), 201
+
+# 팀 주문 전체 조회 api
+@app.route('/orders')  
+def select_OrderList():
+    orders = list(db.orders.find({"status": "active"}).sort("expires_at", 1))
+    return jsonify([serialize_order(order) for order in orders])
+
+# 카테고리별 정렬 api
+@app.route('/orders/category', methods=["GET"])  
+def select_Orders_by_category():
+    category = request.args.get("category")
+    orders = list(db.orders.find(
+        {"food_category": category}).sort("expires_at", 1))
+    if len(orders) == 0:
+        return jsonify({"message": "해당 음식의 진행중인 주문이 없습니다"})
+    return jsonify([serialize_order(order) for order in orders])
+
+@app.route('/order/<string:order_id>', methods=["PUT"])  # 팀 주문 참여 신청 api
+def insert_participation_in_orders(order_id):
+    data = request.get_json()
+    findusername = data["userId_give"]
+
+    # 현재 로그인 유저의 username으로 db에서 해당 유저의 _id값 추출
+    user = db.users.find_one({"username": findusername}, {"_id": 1})
+
+    if not user:
+        return jsonify({"message": "유저를 찾을 수 없습니다."}), 404
+
+    user_object_id = user["_id"]
+
+    order = db.orders.find_one({"order_id": order_id})
+
+    if not order:
+        return jsonify({"message": "주문을 찾을 수 없습니다."}), 404
+
+   # 🔹 이미 참가한 유저인지 확인
+    if user_object_id in order["members"]:
+        return jsonify({"message": "이미 참가한 유저입니다."}), 400
+
+# 🔹 참가자 목록 업데이트 (ObjectId 저장)
+    updated_order = db.orders.update_one(
+        {"order_id": order_id},
+        {"$push": {"participants": user_object_id}}
+    )
+    return jsonify({"message": f"{findusername}님이 주문에 참여했습니다!", "order": updated_order})
+
+
 
 # 앱 실행
 if __name__ == '__main__':
