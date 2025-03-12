@@ -89,31 +89,7 @@
         const ordersContainer = $("#OrdersBox");
 
         // 페이지 로딩 시 팀 주문 전체 조회
-        $.ajax({
-          type: "GET",
-          url: `${API_BASE_URL}/orders`,
-          dataType: "json",
-          success: function (data) {
-            console.log(data, "전체 조회 성공");
-
-            // 기존 카드 삭제 후 새로 추가
-            ordersContainer.empty();
-
-            for (let order of data) {
-              makeOrder(
-                order._id,
-                order.food_category,
-                order.menu_details,
-                order.expires_at,
-                order.participants,
-                order.max_participants
-              );
-            }
-          },
-          error: function (error) {
-            console.error("에러 발생:", error);
-          },
-        });
+        showOrders();
 
         // 모달 열기
         $("[data-modal-toggle='crud-modal']").on("click", function () {
@@ -154,7 +130,9 @@
             }),
             success: function (data) {
               alert(data.message);
+
               modal.addClass("hidden").removeClass("flex");
+              showOrders();
             },
             error: function (error) {
               console.error("에러 발생:", error);
@@ -253,9 +231,9 @@
           const currentTime = new Date();
           const expiresTime = new Date(expires_at); // ISO 8601 형식 변환
           const timeDiff = Math.floor((expiresTime - currentTime) / 60000); // 밀리초 -> 분 변환
-
           let timeDisplay =
-            timeDiff > 0 ? `팀 주문 모집 ${timeDiff}분 전` : "모집 종료";
+            timeDiff > 0 ? `팀 주문 모집 마감 ${timeDiff}분 전` : "모집 종료";
+          console.log(timeDiff);
 
           let tempHtml = `
             <div id="${orderid}" class="group bg-white dark:bg-[#1E2028] rounded-md overflow-hidden border border-gray-100 dark:border-gray-800 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors">
@@ -274,6 +252,34 @@
               </div>
             </div>`;
           $("#OrdersBox").append(tempHtml);
+        }
+
+        function showOrders() {
+          $.ajax({
+            type: "GET",
+            url: `${API_BASE_URL}/orders`,
+            dataType: "json",
+            success: function (data) {
+              console.log(data, "전체 조회 성공");
+
+              // 기존 카드 삭제 후 새로 추가
+              ordersContainer.empty();
+
+              for (let order of data) {
+                makeOrder(
+                  order._id,
+                  order.food_category,
+                  order.menu_details,
+                  order.expires_at,
+                  order.participants,
+                  order.max_participants
+                );
+              }
+            },
+            error: function (error) {
+              console.error("에러 발생:", error);
+            },
+          });
         }
       });
     </script>
