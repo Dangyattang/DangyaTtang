@@ -1,26 +1,489 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>당신은 야식이 땡긴다</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.3/dist/tailwind.min.css" rel="stylesheet">
-</head>
-<body class="bg-gray-100">
-    <div class="max-w-6xl mx-auto p-8 mt-16 bg-white shadow-lg rounded-lg">
-        <h2 class="text-3xl font-bold text-center mb-6">당신은 야식이 땡긴다</h2>
+    <!-- <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.3/dist/tailwind.min.css" rel="stylesheet"> -->
+    <!-- 폰트 헤더 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Gasoek+One&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
 
-        {% if username %}
-            <div class="text-center mb-4">
-                <p>안녕하세요, {{ username }}님!</p>
-                <a href="{{ url_for('logout') }}" class="text-red-500 hover:underline">로그아웃</a>
-            </div>
-        {% else %}
-            <div class="text-center mb-4">
-                <a href="{{ url_for('login_page') }}" class="text-blue-500 hover:underline">로그인</a> |
-                <a href="{{ url_for('register_page') }}" class="text-blue-500 hover:underline">회원가입</a>
-            </div>
-        {% endif %}
+    <!-- JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <style>
+      #orderregi {
+        position: fixed;
+        bottom: 60px;
+        right: 60px;
+      }
+      .challange {
+        margin: 10px auto 30px auto;
+        width: 800px;
+        text-align: center;
+
+        border: 3px solid black;
+        border-radius: 5px;
+
+        padding: 5px;
+      }
+      .gasoek-one-regular {
+        font-family: "Gasoek One", sans-serif;
+        font-weight: 400;
+        font-style: normal;
+        position: relative;
+        top: -5px;
+      }
+
+      .container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        padding: 10px;
+      }
+
+      .wrap {
+        width: 800px;
+        margin: 0 auto; /* 가로 중앙 정렬 */
+      }
+
+      .icon svg {
+        width: 50px;
+        height: 50px;
+        margin: 10px;
+      }
+      .btngroup {
+        display: flex;
+        flex-wrap: nowrap; /* 버튼들이 한 줄에 맞지 않으면 자동으로 줄바꿈 */
+        width: 800px; /* 너비를 800px로 설정 */
+        margin: 0 auto; /* 가로 중앙 정렬 */
+        justify-content: space-evenly; /* 버튼들 간에 균등한 간격을 설정 */
+      }
+      .btngroup button {
+        width: 100px;
+      }
+
+      .max-w-7xl {
+        max-width: 800px;
+      }
+    </style>
+    <script>
+      // $(document).ready(function () {
+      //           $("#OrdersBox").html("");
+      //           showOrder();
+      //       });
+
+      // 모달 스크립트
+      document.addEventListener("DOMContentLoaded", function () {
+        const modal = document.getElementById("crud-modal");
+        const toggleButton = document.querySelector(
+          "[data-modal-toggle='crud-modal']"
+        );
+        const closeButton = modal.querySelector(
+          "[data-modal-toggle='crud-modal']"
+        );
+
+        toggleButton.addEventListener("click", function () {
+          modal.classList.toggle("hidden");
+          modal.classList.toggle("flex");
+        });
+
+        closeButton.addEventListener("click", function () {
+          modal.classList.add("hidden");
+          modal.classList.remove("flex");
+        });
+      });
+      function openClose() {
+        // id 값 post-box의 display 값이 block 이면(= 눈에 보이면)
+        if ($("#crud-modal").css("display") == "block") {
+          // post-box를 가리고
+          $("#crud-modal").hide();
+        }
+      }
+
+      function showOrder() {
+        $.ajax({
+          type: "GET",
+          url: "/orders",
+          data: {},
+          success: function (response) {
+            let orders = response["orders"];
+            console.log(orders);
+            for (let i = 0; i < orders.length; i++) {
+              makeOrder(
+                orders[i]["orderid"],
+                orders[i]["menucata"],
+                orders[i]["menudetail"],
+                orders[i]["time"],
+                orders[i]["numpeople"],
+                orders[i]["numpeoplesize"]
+              );
+            }
+          },
+        });
+      }
+      function makeOrder(orderid, menucata, menudetail, time, numpeople) {
+        let tempHtml = `<!-- Card 1 -->
+    <div
+      id="${orderid}"
+      class="group bg-white dark:bg-[#1E2028] rounded-md overflow-hidden border border-gray-100 dark:border-gray-800 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors"
+
+    >
+      <div class="p-4">
+        <!-- Title -->
+        <h3
+          class="text-lg font-medium text-black dark:text-white mt-2 group-hover:text-indigo-500 transition-colors line-clamp-2"
+        >
+          ${menucata}
+        </h3>
+
+        <!-- Meta Information -->
+        <div class="flex flex-wrap items-center gap-4 mt-4">
+            <span class="text-xs text-gray-500 dark:text-gray-400"> 남은시간 : ${time}</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400"> 필요인원 : ${numpeople}/${numpeoplesize}</span>
+        </div>
+        <div class="mt-1">
+            <span class="text-xs text-gray-500 dark:text-gray-400">${menudetail}</span>
+        </div>
+        <div class="mt-2 flex justify-end">
+            <button class="px-4 py-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">
+                참가
+            </button>
+        </div>
+        
+
+        </div>
+      </div>`;
+        $("#OrdersBox").append(tempHtml);
+      }
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <div style="text-align: left">
+        <span
+          class="gasoek-one-regular"
+          style="color: red; font-size: 40px; display: inline"
+          >당</span
+        >
+        <span
+          class="gasoek-one-regular"
+          style="font-size: 40px; display: inline"
+          >신은
+        </span>
+        <span
+          class="gasoek-one-regular"
+          style="color: red; font-size: 40px; display: inline"
+          >야</span
+        >
+        <span
+          class="gasoek-one-regular"
+          style="font-size: 40px; display: inline"
+          >식이
+        </span>
+        <span
+          class="gasoek-one-regular"
+          style="color: red; font-size: 40px; display: inline"
+          >떙</span
+        >
+        <span
+          class="gasoek-one-regular"
+          style="font-size: 40px; display: inline"
+          >긴다</span
+        >
+      </div>
+
+      <!-- 오른쪽 정렬 -->
+      <span
+        id="user"
+        style="font-family: Arial, Helvetica, sans-serif; font-size: x-large"
+      >
+        정글배달왕
+      </span>
     </div>
-</body>
+    <div class="wrap">
+      <div class="challange">이달의 배달왕</div>
+
+      <div
+        class="btngroup flex items-center justify-center rounded-md shadow-xs"
+        role="group"
+        style="width: 800px; margin: 0 auto"
+      >
+        <button
+          type="button"
+          class="px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 rounded-s-lg hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+        >
+          치킨
+        </button>
+        <button
+          type="button"
+          class="px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+        >
+          피자
+        </button>
+        <button
+          type="button"
+          class="px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+        >
+          중식
+        </button>
+        <button
+          type="button"
+          class="px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+        >
+          일식
+        </button>
+        <button
+          type="button"
+          class="px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+        >
+          양식
+        </button>
+        <button
+          type="button"
+          class="px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+        >
+          분식
+        </button>
+        <button
+          type="button"
+          class="px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+        >
+          탕,찌개
+        </button>
+        <button
+          type="button"
+          class="px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+        >
+          고기
+        </button>
+
+        <button
+          type="button"
+          class="px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 rounded-e-lg hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
+        >
+          디저트
+        </button>
+      </div>
+      <br />
+      <span
+        class="gasoek-one-regular"
+        style="text-align: center; font-size: 30px"
+        >팀 주문</span
+      >
+    </div>
+
+    <!-- Minimal Blog Cards Grid -->
+    <div class="max-w-7xl w-full mx-auto p-4" style="max-width: 800px">
+      <!-- Cards Grid Container -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="OrdersBox">
+        <!-- Card 1 -->
+        <div
+          id="orderid1"
+          class="group bg-white dark:bg-[#1E2028] rounded-md overflow-hidden border border-gray-100 dark:border-gray-800 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors"
+        >
+          <div class="p-4">
+            <!-- Title -->
+            <h3
+              class="text-lg font-medium text-black dark:text-white mt-2 group-hover:text-indigo-500 transition-colors line-clamp-2"
+            >
+              치킨 + 피자
+            </h3>
+
+            <!-- Meta Information -->
+            <div class="flex flex-wrap items-center gap-4 mt-4">
+              <span class="text-xs text-gray-500 dark:text-gray-400">
+                남은시간 : 3분</span
+              >
+              <span class="text-xs text-gray-500 dark:text-gray-400">
+                필요인원 : 2/5</span
+              >
+            </div>
+            <div class="mt-1">
+              <span class="text-xs text-gray-500 dark:text-gray-400"
+                >#허니콤보 #하와이안피자</span
+              >
+            </div>
+            <div class="mt-2 flex justify-end">
+              <button
+                class="px-4 py-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+              >
+                참가
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align: right" id="orderregi">
+      <button
+        data-modal-target="crud-modal"
+        data-modal-toggle="crud-modal"
+        class="px-6 py-2.5 border-2 border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+      >
+        주문등록
+      </button>
+    </div>
+    <!-- Main modal -->
+    <div
+      id="crud-modal"
+      tabindex="-1"
+      aria-hidden="true"
+      class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full"
+    >
+      <div class="relative p-4 w-full max-w-lg max-h-full">
+        <!-- Modal content -->
+        <div class="relative bg-white rounded-lg shadow-sm dark:bg-gray-700">
+          <!-- Modal header -->
+          <div
+            class="flex items-center justify-between p-4 md:p-5 border-b rounded-t dark:border-gray-600 border-gray-200"
+          >
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+              팀주문 열기
+            </h3>
+            <button
+              type="button"
+              class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
+              data-modal-toggle="crud-modal"
+            >
+              <svg
+                class="w-3 h-3"
+                aria-hidden="true"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 14 14"
+              >
+                <path
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
+                />
+              </svg>
+              <span class="sr-only">Close modal</span>
+            </button>
+          </div>
+          <!-- Modal body -->
+          <form class="p-4 md:p-5">
+            <div class="grid gap-4 mb-4 grid-cols-2">
+              <div class="col-span-2">
+                <label
+                  for="kakaoURL"
+                  class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+                  >카카오톡 오픈채팅방 URL</label
+                >
+                <input
+                  type="email"
+                  id="URL"
+                  class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                  placeholder="URL"
+                  required=""
+                />
+              </div>
+              <div class="col-span-2 sm:col-span-1">
+                <label
+                  for="category"
+                  class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+                  >제한시간</label
+                >
+                <select
+                  id="category"
+                  class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                >
+                  <option selected="">시간을 고르시오</option>
+                  <option value="te">10</option>
+                  <option value="tw">20</option>
+                  <option value="th">30</option>
+                </select>
+              </div>
+
+              <div class="col-span-2 sm:col-span-1">
+                <label
+                  for="price"
+                  class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+                  >인원수</label
+                >
+                <input
+                  type="number"
+                  name="price"
+                  id="price"
+                  class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                  placeholder="0"
+                  required=""
+                />
+              </div>
+
+              <div class="col-span-2 sm:col-span-1">
+                <label
+                  for="foodcat"
+                  class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+                  >음식 카테고리</label
+                >
+                <select
+                  id="foodcat"
+                  class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                >
+                  <option selected="">음식 카테고리</option>
+                  <option value="chickin">치킨</option>
+                  <option value="pizza">피자</option>
+                  <option value="chinese">중식</option>
+                  <option value="japanese">일식</option>
+                  <option value="western">양식</option>
+                  <option value="snack">분식</option>
+                  <option value="jjigea">탕,찌개</option>
+                  <option value="meat">고기</option>
+                  <option value="dessert">디저트</option>
+                </select>
+              </div>
+              <div class="col-span-2 sm:col-span-1">
+                <label
+                  for="menu"
+                  class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+                  >상세메뉴</label
+                >
+                <input
+                  type="text"
+                  id="menu"
+                  class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                  placeholder="내가 먹을 메뉴 입력"
+                  required=""
+                />
+              </div>
+            </div>
+            <button
+              type="submit"
+              class="text-white inline-flex items-center bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+            >
+              <svg
+                class="me-1 -ms-1 w-5 h-5"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                  clip-rule="evenodd"
+                ></path>
+              </svg>
+              팀 주문 개설
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </body>
 </html>
