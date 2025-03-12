@@ -251,12 +251,45 @@
                   <span class="text-xs text-gray-500 dark:text-gray-400">${menudetail}</span>
                 </div>
                 <div class="mt-2 flex justify-end">
-                  <button class="px-4 py-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">참가</button>
+                  <button class="apply-button px-4 py-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">참가</button>
                 </div>
               </div>
             </div>`;
           $("#OrdersBox").append(tempHtml);
         }
+
+        // 팀 참가 신청 request
+        $(document).on("click", ".apply-button", function () {
+          // 클릭한 버튼이 속한 주문의 orderid 가져오기
+          let orderId = $(event.target).closest("div[id]").attr("id");
+          if (!orderId) {
+            alert("주문 정보를 찾을 수 없습니다.");
+            return;
+          }
+
+          // 신청 여부 확인
+          let confirmApply = confirm("해당 주문에 참가하시겠습니까?");
+
+          if (confirmApply) {
+            // AJAX 요청 실행
+            $.ajax({
+              url: `/order/${orderId}`,
+              type: "PUT",
+              data: JSON.stringify({ order_id: orderId }),
+              contentType: "application/json",
+              success: function (response) {
+                alert(response.message); // 서버 응답 메시지 출력
+                showOrders();
+              },
+              error: function (error) {
+                alert("신청 중 오류가 발생했습니다.");
+              },
+            });
+          } else {
+            // 취소한 경우 아무 작업도 하지 않음
+            return;
+          }
+        });
 
         function showOrders() {
           $.ajax({
@@ -330,7 +363,9 @@
       >
         {% if username %}
         <div class="text-center mb-4">
-          <a href="{{ url_for('personal') }}">안녕하세요, {{ username }}님!</a>
+          <a href="{{ url_for('personal_page')}}"
+            >안녕하세요, {{ username }}님!</a
+          >
           <a href="{{ url_for('logout') }}" class="text-red-500 hover:underline"
             >로그아웃</a
           >
@@ -685,8 +720,8 @@
           method: "POST",
           credentials: "include",
         })
-          .then(response => response.json())
-          .then(data => {
+          .then((response) => response.json())
+          .then((data) => {
             if (data.access_token) {
               console.log("[DEBUG] 새로운 Access Token 발급 완료");
               document.cookie = `access_token=${data.access_token}; path=/; HttpOnly`;
@@ -694,7 +729,7 @@
               console.error("[ERROR] Access Token 갱신 실패");
             }
           })
-          .catch(error =>
+          .catch((error) =>
             console.error("[ERROR] Refresh Token 요청 실패:", error)
           );
       }
