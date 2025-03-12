@@ -89,7 +89,7 @@ def login_page():
             # JWT 토큰 생성
             token = pyjwt.encode({
                 "user_id": str(user["_id"]),
-                "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=2)
+                "exp": datetime.utcnow() + timedelta(hours=2)
             }, SECRET_KEY, algorithm="HS256")
 
             # JWT 토큰을 쿠키에 담아 클라이언트로 전송
@@ -154,14 +154,15 @@ def logout():
 
 # ===== 팀 주문 api =====
 
-# 팀 주문 등록 api
+
+# 팀 주문 등록 api,
 @app.route('/order', methods=["POST"])  
 def create_Order():
     data = request.json
     minute = int(data["limitTime_give"])
     new_order = {
-        "created_at": datetime.now(timezone.utc),
-        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=minute),
+        "created_at": datetime.now(),
+        "expires_at": datetime.now() + timedelta(minutes=minute),
         "host": ObjectId("67d0254ba0c0fb9bdffbc2e6"),
         "participants": [],
         "max_participants": data["maxPerson_give"],
@@ -178,7 +179,7 @@ def create_Order():
 # 팀 주문 전체 조회 api
 @app.route('/orders')  
 def select_OrderList():
-    orders = list(db.orders.find({"status": "active"}).sort("expires_at", 1))
+    orders = list(db.orders.find({"status": "active"}).sort("expires_at", -1))
     return jsonify([serialize_order(order) for order in orders])
 
 # 카테고리별 정렬 api
