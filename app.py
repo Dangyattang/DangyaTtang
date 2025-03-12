@@ -284,6 +284,20 @@ def refresh_token():
     except pyjwt.ExpiredSignatureError:
         return clear_tokens()
 
+# =====개인페이지 ===========
+
+# 이전주문 카드 전체 조회 api
+@app.route('/orders/prev', methods=["GET"])
+def Select_PreviousOrderList():
+    prevorders = list(db.orders.find({"status":"inactive"}).sort("expires_at", -1))
+
+    return jsonify([serialize_order(prevorder) for prevorder in prevorders])
+# 진행중인 오더 조회
+@app.route('/order/current', methods=["GET"])
+def select_CurrentOrder():
+    user = get_user_from_token()
+    currentorders = list(db.orders.find({"status": "active", "participants": {"$in": [user]}}))
+    return jsonify([serialize_order(order) for order in currentorders])
 
 # ===== 팀 주문 api =====
 

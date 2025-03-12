@@ -81,56 +81,75 @@
       }
     </style>
     <script>
+      const API_BASE_URL = "http://127.0.0.1:5000"; // API 경로 (5000 포트)
+
       $(document).ready(function () {
-        // $("#prevrdersBox").html("");
-        // showprevorder();
+        $("#prevrdersBox").html("");
+        showprevorder();
         $("#membersBox").html("");
         showmem();
       });
+
+      //이전 주문들 보여주기
       function showprevorder() {
-        for (let i = 0; i < 5; i++) {
-          makeprevorder();
-        }
+        // for (let i = 0; i < 5; i++) {
+        //   makeprevorder();
+        // }
         $.ajax({
           type: "GET",
-          url: "/prevorders",
+          url: `${API_BASE_URL}/orders/prev`,
           data: {},
           success: function (response) {
             let prevorders = response["prevorders"];
             console.log(prevorders);
             for (let i = 0; i < prevorders.length; i++) {
               makeprevorder(
-                prevorders[i]["prevorderid"],
-                prevorders[i]["menucatalog"],
-                prevorders[i]["menudetail"],
-                prevorders[i]["ordermember"],
-                prevorders[i]["date"],
-                prevorders[i]["kakaoURL"]
+                prevorders[i]["_id"],
+                prevorders[i]["food_category"],
+                prevorders[i]["menu_details"],
+                prevorders[i]["participants"],
+                prevorders[i]["max_participants"],
+                prevorders[i]["expires_at"],
+                prevorders[i]["open_chat_url"]
               );
             }
           },
         });
       }
+      function insertphonenum(participants) {
+        $.ajax({
+          type: "GET",
+          url: `${API_BASE_URL}/order/prev/phonenum`,
+          data: {},
+          success: function (response) {
+            let phonenum = response["phone"];
+            console.log(phonenum);
+            $("#phoneDisplay").html(`<p>${username} : ${response.phone}</p>`);
+          },
+        });
+      }
       function makeprevorder(
-        prevorderid,
-        menucatalog,
-        menudetail,
-        ordermember,
-        date
+        _id,
+        food_category,
+        menu_details,
+        participants,
+        max_participants,
+        expires_at,
+        open_chat_url
       ) {
-        const strcatalog = menucatalog[0];
-        for (let i = 1; i < menucatalog.length; i++) {
-          strcatalog += " + ";
-          strcatalog += menucatalog[i];
+        const strcatagory = food_category[0];
+        for (let i = 1; i < food_category.length; i++) {
+          strcatagory += " + ";
+          strcatagory += food_category[i];
         }
         const strmemberbtn = "";
-        for (let i = 0; i < ordermember.length; i++) {
+        for (let i = 0; i < participants.length; i++) {
           strmemberbtn += `<span class="flex items-center gap-3" id="memsBox1">
       <div
         class="p-1 rounded-full bg-gradient-to-br from-pink-500 to-orange-500"
       >
-        <div class="p-0.5 rounded-full bg-white">
-          <div>${ordermember[i]}</div>
+        <div class="p-0.5 rounded-full bg-white" onclick="insertphonenum('${participants[i]}')">
+          <div>${participants[i]}</div>
         </div>
       </div>
     </span>`;
@@ -138,7 +157,7 @@
 
         let tempHtml = `<!-- Card -->
           <div
-            id="${prevorderid}"
+            id="${_id}"
             class="group bg-white dark:bg-[#1E2028] rounded-md overflow-hidden border border-gray-100 dark:border-gray-800 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors"
           >
             <div class="p-4" style="text-align: left">
@@ -146,24 +165,24 @@
               <h3
                 class="text-lg font-medium text-black dark:text-white mt-2 group-hover:text-indigo-500 transition-colors line-clamp-2"
               >
-              ${strcatalog}
+              ${strcatagory}
               </h3>
 
               <!-- Meta Information -->
               <span class="text-xs text-gray-500 dark:text-gray-400">
                 오픈카카오톡 URL:
-                <a href="${kakaoURL}" style="color: blue"
-                  >${kakaoURL}</a
+                <a href="${open_chat_url}" style="color: blue"
+                  >${open_chat_url}</a
                 ></span
               >
               <div class="mt-1">
                 <span class="text-xs text-gray-500 dark:text-gray-400"
-                  >${menudetail}</span
+                  >${menu_details}</span
                 >
               </div>
               <span>
                 ${strmemberbtn}
-
+                <span id="phoneDisplay" style="margin-top: 10px;"></span>
                 </span>
             </div>
           </div>`;
@@ -183,7 +202,7 @@
       //         for (let i = 0; i < ordermembers.length; i++) {
       //           makemember(
       //             ordermembers[i]["orderid"],
-      //             ordermembers[i]["menucatalog"],
+      //             ordermembers[i]["menucatagory"],
 
       //           );
       //         }
@@ -204,31 +223,38 @@
       function showOrder() {
         $.ajax({
           type: "GET",
-          url: "/currentorder",
+          url: `${API_BASE_URL}/currentorder`,
           data: {},
           success: function (response) {
             let currentorder = response["currentorder"];
             console.log(currentorder);
             makeOrder(
-              currentorder[i]["orderid"],
-              currentorder[i]["menucatalog"],
-              currentorder[i]["menudetail"],
+              currentorder[i]["_id"],
+              currentorder[i]["food_category"],
+              currentorder[i]["menu_details"],
               currentorder[i]["time"],
-              currentorder[i]["numpeople"],
-              currentorder[i]["numpeoplesize"]
+              currentorder[i]["participants"],
+              currentorder[i]["max_participants"]
             );
           },
         });
       }
-      function makeOrder(orderid, menucatalog, menudetail, time, numpeople) {
-        const strcatalog = menucatalog[0];
-        for (let i = 1; i < menucatalog.length; i++) {
-          strcatalog += " + ";
-          strcatalog += menucatalog[i];
+      function makeOrder(
+        _id,
+        food_category,
+        menu_details,
+        time,
+        participants,
+        max_participants
+      ) {
+        const strcatagory = food_category[0];
+        for (let i = 1; i < food_category.length; i++) {
+          strcatagory += " + ";
+          strcatagory += food_category[i];
         }
         let tempHtml = `<!-- Card 1 -->
     <div
-      id="${orderid}"
+      id="${_id}"
       class="group bg-white dark:bg-[#1E2028] rounded-md overflow-hidden border border-gray-100 dark:border-gray-800 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors"
 
     >
@@ -237,7 +263,7 @@
         <h3
           class="text-lg font-medium text-black dark:text-white mt-2 group-hover:text-indigo-500 transition-colors line-clamp-2"
         >
-          ${strcatalog}
+          ${strcatagory}
         </h3>
 
         <!-- Meta Information -->
