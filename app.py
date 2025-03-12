@@ -29,7 +29,6 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         access_token = request.cookies.get("access_token")
         print(access_token, "gg")
-        g.access = access_token
         if not access_token:
             print("[DEBUG] Access Token이 없음, 로그인 필요")  
             return redirect(url_for("login_page"))  
@@ -62,7 +61,7 @@ def login_required(f):
 def create_access_token(user_id):
     return pyjwt.encode({
         "user_id": user_id,
-        "exp": datetime.utcnow() + timedelta(minutes=5)  # 30초초 후 만료
+        "exp": datetime.utcnow() + timedelta(minutes=1)  # 30초초 후 만료
     }, SECRET_KEY, algorithm="HS256")
 
 def create_refresh_token(user_id):
