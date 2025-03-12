@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회원가입</title>
+    <!-- Tailwind CSS & 폰트 로드 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Gasoek+One&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gasoek-one-regular {
+            font-family: "Gasoek One", sans-serif;
+            font-weight: 400;
+            font-style: normal;
+        }
+    </style>
+    <script>
+        let isUsernameChecked = false; // 아이디 중복확인 여부 저장
+
+        async function checkUsername() {
+            const username = document.getElementById("username").value;
+            if (!username) {
+                alert("아이디를 입력해주세요.");
+                return;
+            }
+        
+            try {
+                const response = await fetch(`/check-username?username=${username}`);
+                const result = await response.json();
+        
+                alert(result.message);  // 백엔드에서 받은 메시지를 그대로 출력
+        
+                if (result.available) {
+                    isUsernameChecked = true; // 중복 확인 완료
+                } else {
+                    isUsernameChecked = false;
+                }
+            } catch (error) {
+                console.error("중복 확인 요청 실패:", error);
+                alert("아이디 중복 확인 중 오류가 발생했습니다.");
+                isUsernameChecked = false;
+            }
+        }
+
+        function validateForm() {
+            const name = document.getElementById("name").value;
+            const namePattern = /^[가-힣]{2,5}$/;
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+            const confirmPassword = document.getElementById("confirm-password").value;
+            const email = document.getElementById("email").value;
+            const phone = document.getElementById("phone").value;
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const phonePattern = /^\d{11}$/;
+
+            if (!namePattern.test(name)) {
+                alert("실명을 입력해주세요.");
+                return false;
+            }
+            if (!isUsernameChecked) {
+                alert("아이디 중복 확인을 해주세요.");
+                return false;
+            }
+            if (password !== confirmPassword) {
+                alert("비밀번호가 일치하지 않습니다.");
+                return false;
+            }
+            if (!emailPattern.test(email)) {
+                alert("올바른 이메일 형식이 아닙니다.");
+                return false;
+            }
+            if (!phonePattern.test(phone)) {
+                alert("전화번호는 11자리 숫자여야 합니다.");
+                return false;
+            }
+
+            return confirm("가입하시겠습니까?");
+        }
+    </script>
+</head>
+<body class="flex justify-center items-center h-screen bg-gray-100">
+    <div class="bg-white p-8 rounded-lg shadow-lg w-[35rem] text-center">
+        <!-- 로고 -->
+        <a href="/" class="block text-center cursor-pointer hover:opacity-80 w-fit mx-auto">
+            <div class="mb-6 inline-flex justify-center text-5xl font-bold leading-none">
+                <span class="gasoek-one-regular text-red-500">당</span>
+                <span class="gasoek-one-regular">신은&nbsp;</span>
+                <span class="gasoek-one-regular text-red-500">야</span>
+                <span class="gasoek-one-regular">식이&nbsp;</span>
+                <span class="gasoek-one-regular text-red-500">땡</span>
+                <span class="gasoek-one-regular">긴다</span>
+            </div>
+        </a>
+        
+
+        <!-- 회원가입 폼 -->
+        <form action="/register" method="POST" onsubmit="return validateForm()" class="space-y-4">
+            <div>
+                <input type="text" id="name" name="name" placeholder="이름(타잔)" class="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+            <div class="flex">
+                <input type="text" id="username" name="username" placeholder="아이디(정글 99기-99)" class="flex-1 p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 mr-2">
+                <button type="button" onclick="checkUsername()" class="px-4 bg-blue-500 text-white rounded-md">중복확인</button>
+            </div>            
+            <div>
+                <input type="password" id="password" name="password" placeholder="비밀번호(4~20글자)" class="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+            <div>
+                <input type="password" id="confirm-password" name="confirm-password" placeholder="비밀번호 확인(4~20글자)" class="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+            <div>
+                <input type="text" id="email" name="email" placeholder="이메일(tarzan@jungle.com)" class="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+            <div>
+                <input type="text" id="phone" name="phone" placeholder="전화번호(11자리 숫자)" class="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+            <button type="submit" class="w-full bg-green-500 text-white py-2 rounded-md hover:bg-green-600 transition">회원가입</button>
+        </form>
+
+        <p class="mt-4 text-gray-600">이미 계정이 있으신가요? 
+            <a href="{{ url_for('login_page') }}" class="text-blue-500 hover:underline">로그인</a>
+        </p>
+    </div>
+</body>
+</html>
