@@ -11,6 +11,8 @@ import requests
 import os
 from dotenv import load_dotenv
 from functools import wraps
+import threading
+import time
 
 
 app = Flask(__name__)
@@ -150,6 +152,22 @@ def serialize_order(order):
         "food_category": order["food_category"],
         "menu_details": order["menu_details"]
     }
+
+
+def update_expired_orders():
+    """주기적으로 모집 종료된 주문을 'failed' 상태로 변경"""
+    while True:
+        now = datetime.now()
+        db.orders.update_many(
+            {"expires_at": {"$lt": now}, "status": "active"},
+            {"$set": {"status": "failed"}}
+        )
+        print("[INFO] 모집 종료된 주문 상태 업데이트 완료", datetime.now())
+        time.sleep(30)  # 30초마다 체크
+        
+
+# 백그라운드 스레드 시작
+threading.Thread(target=update_expired_orders, daemon=True).start()
     
 # 야식왕 선정
 def get_top_delivery_user():
@@ -324,6 +342,10 @@ def create_Order():
 # 팀 주문 전체 조회 api
 @app.route('/orders')  
 def select_OrderList():
+    user = get_user_from_token()
+
+    user_id = str(user["_id"])
+
     orders = list(db.orders.find({"status": "active"}).sort("expires_at", -1))
     return jsonify([serialize_order(order) for order in orders])
 
@@ -332,9 +354,8 @@ def select_OrderList():
 def select_Orders_by_category():
     category = request.args.get("category")
     orders = list(db.orders.find(
-        {"food_category": category}).sort("expires_at", 1))
-    if len(orders) == 0:
-        return jsonify({"message": "해당 음식의 진행중인 주문이 없습니다"})
+        {"food_category": category, "status": "active"}).sort("expires_at", 1))
+    
     return jsonify([serialize_order(order) for order in orders])
 
 @app.route('/order/<string:order_id>', methods=["PUT"])  # 팀 주문 참여 신청 api
