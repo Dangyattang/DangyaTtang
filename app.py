@@ -61,13 +61,13 @@ def login_required(f):
 def create_access_token(user_id):
     return pyjwt.encode({
         "user_id": user_id,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(seconds=10)  # 30초초 후 만료
+        "exp": datetime.utcnow() + timedelta(minutes=1)  # 30초초 후 만료
     }, SECRET_KEY, algorithm="HS256")
 
 def create_refresh_token(user_id):
     return pyjwt.encode({
         "user_id": user_id,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=1)  # 1분 후 만료
+        "exp": datetime.utcnow() + timedelta(minutes=10)  # 1분 후 만료
     }, SECRET_KEY, algorithm="HS256")
 
 def get_user_from_token():
