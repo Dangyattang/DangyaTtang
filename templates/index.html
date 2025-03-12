@@ -1,11 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>당신은 야식이 땡긴다</title>
-  </head>
-  <body>
-    <h1>hi</h1>
-  </body>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.3/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div class="max-w-6xl mx-auto p-8 mt-16 bg-white shadow-lg rounded-lg">
+        <h2 class="text-3xl font-bold text-center mb-6">당신은 야식이 땡긴다</h2>
+
+        {% if username %}
+            <div class="text-center mb-4">
+                <p>안녕하세요, {{ username }}님!</p>
+                <a href="{{ url_for('logout') }}" class="text-red-500 hover:underline">로그아웃</a>
+            </div>
+        {% else %}
+            <div class="text-center mb-4">
+                <a href="{{ url_for('login_page') }}" class="text-blue-500 hover:underline">로그인</a> |
+                <a href="{{ url_for('register_page') }}" class="text-blue-500 hover:underline">회원가입</a>
+            </div>
+        {% endif %}
+    </div>
+</body>
 </html>

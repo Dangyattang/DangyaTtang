@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인</title>
+    <!-- Tailwind CSS & 폰트 로드 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Gasoek+One&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gasoek-one-regular {
+            font-family: "Gasoek One", sans-serif;
+            font-weight: 400;
+            font-style: normal;
+        }
+    </style>
+</head>
+
+<body class="flex justify-center items-center h-screen bg-gray-100">
+    <div class="bg-white p-10 rounded-lg shadow-lg w-[35rem] text-center">
+        <!-- 로고 -->
+        <a href="/" class="block text-center cursor-pointer hover:opacity-80 w-fit mx-auto">
+            <div class="mb-6 inline-flex justify-center text-5xl font-bold leading-none">
+                <span class="gasoek-one-regular text-red-500">당</span>
+                <span class="gasoek-one-regular">신은&nbsp;</span>
+                <span class="gasoek-one-regular text-red-500">야</span>
+                <span class="gasoek-one-regular">식이&nbsp;</span>
+                <span class="gasoek-one-regular text-red-500">땡</span>
+                <span class="gasoek-one-regular">긴다</span>
+            </div>
+        </a>
+        
+
+        {% if error %}
+        <div class="bg-red-400 text-white p-2 mb-4 rounded">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="POST" class="space-y-4">
+            <div>
+                <input type="text" id="username" name="username" placeholder="아이디" class="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <input type="password" id="password" name="password" placeholder="비밀번호" class="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600 transition">로그인</button>
+        </form>
+
+        <p class="mt-4 text-gray-600">아직 계정이 없으신가요? 
+            <a href="{{ url_for('register_page') }}" class="text-blue-500 hover:underline">회원가입</a>
+        </p>
+    </div>
+</body>
+</html>
