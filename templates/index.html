@@ -640,3 +640,52 @@
     </div>
   </body>
 </html>
+
+<script>
+  async function checkTokenStatus() {
+      const cookies = document.cookie.split('; ').reduce((acc, cookie) => {
+          const [name, value] = cookie.split('=');
+          acc[name] = value;
+          return acc;
+      }, {});
+  
+      const now = Date.now();
+  
+      // ✅ Access Token 만료 임박 시 자동 갱신
+      if (cookies["access_token"]) {
+          const tokenPayload = JSON.parse(atob(cookies["access_token"].split('.')[1]));
+          const exp = tokenPayload.exp * 1000;
+  
+          if (exp - now < 5000) {  // 🔥 5초 이하로 남으면 자동 갱신
+              console.log("[DEBUG] Access Token 만료 임박, Refresh Token 요청");
+              await fetch('/refresh-token', { method: 'POST', credentials: 'include' })
+                  .then(response => response.json())
+                  .then(data => {
+                      if (data.access_token) {
+                          console.log("[DEBUG] 새로운 Access Token 발급 완료");
+                          document.cookie = `access_token=${data.access_token}; path=/; HttpOnly`;
+                      } else {
+                          console.error("[ERROR] Access Token 갱신 실패");
+                      }
+                  })
+                  .catch(error => console.error("[ERROR] Refresh Token 요청 실패:", error));
+          }
+      }
+  
+      // ✅ Refresh Token 만료 시 자동 로그아웃
+      if (cookies["refresh_token"]) {
+          const refreshPayload = JSON.parse(atob(cookies["refresh_token"].split('.')[1]));
+          const refreshExp = refreshPayload.exp * 1000;
+  
+          if (refreshExp < now) {
+              console.log("[DEBUG] Refresh Token 만료됨, 자동 로그아웃 실행");
+              await fetch('/logout', { method: 'GET', credentials: 'include' })
+                  .then(() => window.location.href = "/login");
+          }
+      }
+  }
+  
+  // 🔥 10초마다 Access Token & Refresh Token 상태 확인
+  setInterval(checkTokenStatus, 10000);
+  </script>
+  
