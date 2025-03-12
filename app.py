@@ -16,7 +16,7 @@ from functools import wraps
 app = Flask(__name__)
 
 # MongoDB 연결
-client = MongoClient("mongodb://localhost:27017/")
+client = MongoClient('mongodb://test:test@localhost',27017)
 db = client["dangyattang"]
 
 # 비밀키 로드
@@ -387,4 +387,4 @@ def insert_participation_in_orders(order_id):
 
 # 앱 실행
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
