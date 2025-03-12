@@ -251,12 +251,45 @@
                   <span class="text-xs text-gray-500 dark:text-gray-400">${menudetail}</span>
                 </div>
                 <div class="mt-2 flex justify-end">
-                  <button class="px-4 py-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">참가</button>
+                  <button class="apply-button px-4 py-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">참가</button>
                 </div>
               </div>
             </div>`;
           $("#OrdersBox").append(tempHtml);
         }
+
+        // 팀 참가 신청 request
+        $(document).on("click", ".apply-button", function () {
+          // 클릭한 버튼이 속한 주문의 orderid 가져오기
+          let orderId = $(event.target).closest("div[id]").attr("id");
+          if (!orderId) {
+            alert("주문 정보를 찾을 수 없습니다.");
+            return;
+          }
+
+          // 신청 여부 확인
+          let confirmApply = confirm("해당 주문에 참가하시겠습니까?");
+
+          if (confirmApply) {
+            // AJAX 요청 실행
+            $.ajax({
+              url: `/order/${orderId}`,
+              type: "PUT",
+              data: JSON.stringify({ order_id: orderId }),
+              contentType: "application/json",
+              success: function (response) {
+                alert(response.message); // 서버 응답 메시지 출력
+                showOrders();
+              },
+              error: function (error) {
+                alert("신청 중 오류가 발생했습니다.");
+              },
+            });
+          } else {
+            // 취소한 경우 아무 작업도 하지 않음
+            return;
+          }
+        });
 
         function showOrders() {
           $.ajax({
@@ -291,68 +324,57 @@
   <body>
     <div class="container">
       <div style="text-align: left">
-        <span
-          class="gasoek-one-regular"
-          style="color: red; font-size: 40px; display: inline"
-          >당</span
+        <a
+          href="/"
+          class="block text-center cursor-pointer hover:opacity-80 w-fit mx-auto"
         >
-        <span
-          class="gasoek-one-regular"
-          style="font-size: 40px; display: inline"
-          >신은
-        </span>
-        <span
-          class="gasoek-one-regular"
-          style="color: red; font-size: 40px; display: inline"
-          >야</span
-        >
-        <span
-          class="gasoek-one-regular"
-          style="font-size: 40px; display: inline"
-          >식이
-        </span>
-        <span
-          class="gasoek-one-regular"
-          style="color: red; font-size: 40px; display: inline"
-          >떙</span
-        >
-        <span
-          class="gasoek-one-regular"
-          style="font-size: 40px; display: inline"
-          >긴다</span
-        >
+          <div
+            class="mb-6 inline-flex justify-center text-5xl font-bold leading-none"
+          >
+            <span class="gasoek-one-regular text-red-500">당</span>
+            <span class="gasoek-one-regular">신은&nbsp;</span>
+            <span class="gasoek-one-regular text-red-500">야</span>
+            <span class="gasoek-one-regular">식이&nbsp;</span>
+            <span class="gasoek-one-regular text-red-500">땡</span>
+            <span class="gasoek-one-regular">긴다</span>
+          </div>
+        </a>
       </div>
 
       <!-- 오른쪽 정렬 -->
-      <span
-        id="user"
-        style="font-family: Arial, Helvetica, sans-serif; font-size: x-large"
-      >
-        {% if username %}
-        <div class="text-center mb-4">
-          <a href="{{ url_for('personal_page') }}"
-            >안녕하세요, {{ username }}님!</a
-          >
-          <a href="{{ url_for('logout') }}" class="text-red-500 hover:underline"
-            >로그아웃</a
-          >
-        </div>
-        {% else %}
-        <div class="text-center mb-4">
-          <a
-            href="{{ url_for('login_page') }}"
-            class="text-blue-500 hover:underline"
-            >로그인</a
-          >
-          |
-          <a
-            href="{{ url_for('register_page') }}"
-            class="text-blue-500 hover:underline"
-            >회원가입</a
-          >
-        </div>
-        {% endif %}
-      </span>
+      <div style="text-align: right">
+        <span
+          id="user"
+          style="font-family: Arial, Helvetica, sans-serif; font-size: x-large"
+        >
+          {% if username %}
+          <div class="text-center mb-4">
+            <a href="{{ url_for('personal_page') }}"
+              >안녕하세요, {{ username }}님!</a
+            >
+            <a
+              href="{{ url_for('logout') }}"
+              class="text-red-500 hover:underline"
+              >로그아웃</a
+            >
+          </div>
+          {% else %}
+          <div class="text-center mb-4">
+            <a
+              href="{{ url_for('login_page') }}"
+              class="text-blue-500 hover:underline"
+              >로그인</a
+            >
+            |
+            <a
+              href="{{ url_for('register_page') }}"
+              class="text-blue-500 hover:underline"
+              >회원가입</a
+            >
+          </div>
+          {% endif %}
+        </span>
+      </div>
     </div>
     <div class="wrap">
       <!-- ✅ 이달의 야식왕 (독립된 섹션) -->
@@ -565,9 +587,9 @@
                   class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
                 >
                   <option selected="">시간을 고르시오</option>
-                  <option value="10">10</option>
-                  <option value="20">20</option>
-                  <option value="30">30</option>
+                  <option value="10">10분</option>
+                  <option value="20">20분</option>
+                  <option value="30">30분</option>
                 </select>
               </div>
 
