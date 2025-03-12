@@ -146,15 +146,36 @@ def serialize_order(order):
         "food_category": order["food_category"],
         "menu_details": order["menu_details"]
     }
+    
+# 야식왕 선정
+def get_top_delivery_user():
+    """참여 확정된 주문이 가장 많은 사용자 찾기 (동점자 처리 포함)"""
+    users = list(db.users.find({}, {"name": 1, "past_orders": 1}))
+
+    if not users:
+        return None  # 사용자가 없으면 None 반환
+
+    # ✅ 참여 확정된 주문 개수 + 가장 최근 주문 시점 기준 정렬
+    sorted_users = sorted(users, key=lambda u: (
+        len(u.get("past_orders", [])),  # 1️⃣ past_orders 개수 (내림차순)
+        max(u["past_orders"]) if u.get("past_orders") else datetime.min  # 2️⃣ 가장 최근 주문 날짜 기준 (내림차순)
+    ), reverse=True)
+
+    top_user = sorted_users[0]  # 가장 많은 주문 참여자 중 가장 최근 참여자
+    return top_user["name"] if top_user.get("past_orders") else None
+
 
 # 홈 페이지
 @app.route('/')
 @login_required
 def home():
     user = get_user_from_token()
+    top_user = get_top_delivery_user()
     if user:
         return render_template('index.html', username=user["name"])
-    return render_template('index.html')
+    return render_template('index.html', 
+                           username=user["name"] if user else None, 
+                           top_delivery_user=top_user)
 
 # 로그인 페이지
 @app.route("/login", methods=["GET", "POST"])
