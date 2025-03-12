@@ -72,24 +72,28 @@ def create_refresh_token(user_id):
 
 def get_user_from_token():
     access_token = request.cookies.get("access_token")
+    print(f"🔍 Access Token from Cookie: {access_token}")  # ✅ 추가 디버깅용 출력
 
     if access_token:
         try:
             decoded_token = pyjwt.decode(access_token, SECRET_KEY, algorithms=["HS256"])
             user_id = decoded_token.get("user_id")
+            print(f"✅ Decoded User ID: {user_id}")  # ✅ 추가 디버깅용 출력
             return db.users.find_one({"_id": ObjectId(user_id)})
-
         except pyjwt.ExpiredSignatureError:
+            print("[⚠️] Access Token expired. Checking Refresh Token...")  
             refresh_token = request.cookies.get("refresh_token")
             if refresh_token:
                 new_access_token = refresh_access_token(refresh_token)
                 if new_access_token:
-                    # ✅ 새로운 Access Token을 쿠키에 저장 (Response 반환 X)
+                    print(f"✅ New Access Token: {new_access_token}")  
                     response = make_response()
                     response.set_cookie("access_token", new_access_token, httponly=True, secure=False)
                     return db.users.find_one({"_id": ObjectId(pyjwt.decode(new_access_token, SECRET_KEY, algorithms=["HS256"])["user_id"])})
 
+    print("[ERROR] Failed to retrieve user from token")  
     return None
+
 
 
 def refresh_access_token(refresh_token):
@@ -201,8 +205,13 @@ def login_page():
             response.set_cookie("access_token", access_token, httponly=True, secure=False)
             response.set_cookie("refresh_token", refresh_token, httponly=True, secure=False)
 
+            print(f"✅ 로그인 성공: {username}, 유저 ID: {user['_id']}")
+            print(f"✅ 생성된 Access Token: {access_token}")
+            print(f"✅ 생성된 Refresh Token: {refresh_token}")
+            print(f"✅ 리디렉트 실행됨: {url_for('home')}")
             return response
         else:
+            print(f"❌ 로그인 실패: 아이디 또는 비밀번호 오류 - {username}")
             return render_template("login.html", error="로그인 실패! 아이디 또는 비밀번호를 확인하세요.")
     return render_template("login.html")
 

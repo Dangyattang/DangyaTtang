@@ -330,7 +330,9 @@
       >
         {% if username %}
         <div class="text-center mb-4">
-          <a href="{{ url_for('personal') }}">안녕하세요, {{ username }}님!</a>
+          <a href="{{ url_for('personal_page') }}"
+            >안녕하세요, {{ username }}님!</a
+          >
           <a href="{{ url_for('logout') }}" class="text-red-500 hover:underline"
             >로그아웃</a
           >
