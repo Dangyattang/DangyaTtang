@@ -343,86 +343,53 @@
       </span>
     </div>
     <div class="wrap">
-      <div class="challange">이달의 배달왕</div>
-
-      <div
-        id="category-groups"
-        class="btngroup flex items-center justify-center rounded-md shadow-xs"
-        role="group"
-        style="width: 800px; margin: 0 auto"
-      >
-        <button
-          type="button"
-          value="치킨"
-          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 rounded-s-lg hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
-        >
-          치킨
-        </button>
-        <button
-          type="button"
-          value="피자"
-          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
-        >
-          피자
-        </button>
-        <button
-          type="button"
-          value="중식"
-          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
-        >
-          중식
-        </button>
-        <button
-          type="button"
-          value="일식"
-          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
-        >
-          일식
-        </button>
-        <button
-          type="button"
-          value="양식"
-          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
-        >
-          양식
-        </button>
-        <button
-          type="button"
-          value="분식"
-          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
-        >
-          분식
-        </button>
-        <button
-          type="button"
-          value="탕,찌개"
-          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
-        >
-          탕,찌개
-        </button>
-        <button
-          type="button"
-          value="고기"
-          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
-        >
-          고기
-        </button>
-
-        <button
-          type="button"
-          value="디저트"
-          class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 rounded-e-lg hover:bg-gray-900 hover:text-white focus:z-10 focus:ring-2 focus:ring-gray-500 focus:bg-gray-900 focus:text-white dark:border-white dark:text-white dark:hover:text-white dark:hover:bg-gray-700 dark:focus:bg-gray-700"
-        >
-          디저트
-        </button>
+      <!-- ✅ 이달의 야식왕 (독립된 섹션) -->
+      <div class="text-center text-lg font-bold mb-6">
+          {% if top_delivery_user %}
+              <p class="text-2xl">🏆 이달의 야식왕 <span class="text-red-500">'{{ top_delivery_user }}'</span>님! 🎉</p>
+          {% else %}
+              <p class="text-gray-600">아직 야식왕이 없습니다! 첫 번째 야식왕이 되어보세요!</p>
+          {% endif %}
       </div>
+  
+      <!-- ✅ 음식 카테고리 필터 (별도 섹션) -->
+      <div class="btngroup flex items-center justify-center rounded-md shadow-xs"
+           role="group"
+           style="width: 800px; margin: 0 auto">
+          <button type="button" value="치킨" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 rounded-s-lg hover:bg-gray-900 hover:text-white">
+              치킨
+          </button>
+          <button type="button" value="피자" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white">
+              피자
+          </button>
+          <button type="button" value="중식" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white">
+              중식
+          </button>
+          <button type="button" value="일식" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white">
+              일식
+          </button>
+          <button type="button" value="양식" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white">
+              양식
+          </button>
+          <button type="button" value="분식" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white">
+              분식
+          </button>
+          <button type="button" value="탕,찌개" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white">
+              탕,찌개
+          </button>
+          <button type="button" value="고기" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 hover:bg-gray-900 hover:text-white">
+              고기
+          </button>
+          <button type="button" value="디저트" class="getFoodCategoryButton px-4 py-2 text-sm font-medium text-gray-900 bg-transparent border border-gray-900 rounded-e-lg hover:bg-gray-900 hover:text-white">
+              디저트
+          </button>
+      </div>
+  
       <br />
-      <span
-        class="gasoek-one-regular"
-        style="text-align: center; font-size: 30px"
-        >팀 주문</span
-      >
-    </div>
+      <span class="gasoek-one-regular text-center text-3xl">팀 주문</span>
+
+
+  </div>
 
     <!-- Minimal Blog Cards Grid -->
     <div class="max-w-7xl w-full mx-auto p-4" style="max-width: 800px">
