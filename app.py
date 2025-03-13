@@ -15,9 +15,15 @@ import threading
 import time
 import threading
 import time
+from flask_socketio import SocketIO
+from flask_cors import CORS
+
+
 
 
 app = Flask(__name__)
+CORS(app)  # ✅ CORS 허용
+socketio = SocketIO(app, cors_allowed_origins="*")  # 웹소켓 설정
 
 # MongoDB 연결
 client = MongoClient('mongodb://test:test@localhost',27017)
@@ -161,21 +167,56 @@ def serialize_order(order):
         "menu_details": order["menu_details"]
     }
 
-
-def update_expired_orders():
-    """주기적으로 모집 종료된 주문을 'failed' 상태로 변경"""
+@socketio.on("order_update", namespace="/")
+def check_and_update_orders():
+    """주문 상태를 주기적으로 업데이트하는 백그라운드 작업"""
     while True:
-        now = datetime.now()
-        db.orders.update_many(
-            {"expires_at": {"$lt": now}, "status": "active"},
-            {"$set": {"status": "failed"}}
-        )
-        print("[INFO] 모집 종료된 주문 상태 업데이트 완료", datetime.now())
-        time.sleep(30)  # 30초마다 체크
-        
+        now = datetime.now(timezone.utc)
+        orders = db.orders.find({"status": "active"})
+        for order in orders:
+            order_id = str(order["_id"])
+            expires_at = order["expires_at"]
 
-# 백그라운드 스레드 시작
-threading.Thread(target=update_expired_orders, daemon=True).start()
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            if expires_at < now:  # 🔥 제한시간 마감 시 failed 처리
+                db.orders.update_one({"_id": order["_id"]}, {"$set": {"status": "failed"}})
+                print(f"🚨 주문 {order_id} 모집 마감 (Failed) - 알림 전송 중...")
+                remove_active_order_from_users(order["participants"], order_id)
+                socketio.emit("order_update", {"order_id": order_id, "status": "failed"})  # 알람 전송
+                print(f"🚨 주문 {order_id} 모집 마감 (Failed)")
+
+            elif len(order["participants"]) >= int(order["max_participants"]):  # 🔥 인원 충족 시 confirmed 처리
+                db.orders.update_one({"_id": order["_id"]}, {"$set": {"status": "confirmed"}})
+                print(f"✅ 주문 {order_id} 확정됨 (Confirmed), 알람 전송")
+                remove_active_order_from_users(order["participants"], order_id)
+                add_to_past_orders(order["participants"], order_id)
+
+                socketio.emit("order_update", {"order_id": order_id, "status": "confirmed"})  # 알람 전송
+
+        time.sleep(10)  # 10초마다 체크
+
+# 🔥 스레드 실행 (앱 시작 시)
+thread = threading.Thread(target=check_and_update_orders, daemon=True)
+thread.start()
+
+def remove_active_order_from_users(participants, order_id):
+    """주문이 완료되거나 실패했을 때 참가자의 active_order에서 제거"""
+    for user_id in participants:
+        db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$unset": {"active_order": ""}}  # `active_order` 필드 제거
+        )
+    print(f"🔄 모든 참가자의 active_order에서 {order_id} 제거 완료")
+
+def add_to_past_orders(participants, order_id):
+    """주문이 확정되었을 때 참가자의 past_orders 배열에 추가"""
+    for user_id in participants:
+        db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$push": {"past_orders": order_id}}  # ✅ 주문 ID 추가
+        )
+    print(f"📌 모든 참가자의 past_orders에 {order_id} 추가 완료")
 
 
 def update_expired_orders():
@@ -220,7 +261,7 @@ def home():
     top_user = get_top_delivery_user()
     return render_template('index.html', 
                            username=user["name"] if user else None, 
-                           top_delivery_user=top_user)
+                           top_delivery_user=top_user,user_id=user["_id"])
 
 # 로그인 페이지
 @app.route("/login", methods=["GET", "POST"])
@@ -396,16 +437,20 @@ def get_phone():
 
 # 팀 주문 등록 api,
 @app.route('/order', methods=["POST"])  
+@login_required
 def create_Order():
     data = request.json
     minute = int(data["limitTime_give"])
+    max_participants = int(data["maxPerson_give"])  # ✅ max_participants를 int로 변환
+    host_id = g.user_id  # 현재 로그인한 사용자의 ID 가져오기
+
     new_order = {
         "created_at": datetime.now(),
         "expires_at": datetime.now() + timedelta(minutes=minute),
-        "host": ObjectId("67d0254ba0c0fb9bdffbc2e6"),
-        "participants": [],
-        "max_participants": data["maxPerson_give"],
-        "current_participants": 0,
+        "host": ObjectId(host_id),
+        "participants": [ObjectId(host_id)],
+        "max_participants": max_participants,  # ✅ int 타입으로 저장
+        "current_participants": 1,
         "status": "active",
         "open_chat_url": data["kakaoUrl_give"],
         "food_category": data["foodCategory_give"],
@@ -413,17 +458,33 @@ def create_Order():
     }
     order_id = db.orders.insert_one(new_order).inserted_id
 
+    # ✅ 등록자의 `active_order` 업데이트
+    db.users.update_one(
+        {"_id": ObjectId(host_id)},
+        {"$set": {"active_order": order_id}}
+    )
+
     return jsonify({"message": "주문 생성 완료", "order_id": str(order_id)}), 201
 
 # 팀 주문 전체 조회 api
-@app.route('/orders')  
+@app.route('/orders')
 def select_OrderList():
     user = get_user_from_token()
+
+    if not user:
+        return jsonify({"error": "로그인 필요"}), 401
 
     user_id = str(user["_id"])
 
     orders = list(db.orders.find({"status": "active"}).sort("expires_at", -1))
-    return jsonify([serialize_order(order) for order in orders])
+
+    for order in orders:
+        order["_id"] = str(order["_id"])  # ObjectId → 문자열 변환
+        order["participants"] = [str(p) for p in order["participants"]]  # ObjectId → 문자열 변환
+        order["created_at"] = order["created_at"].isoformat()  # ✅ datetime → ISO 8601 문자열 변환
+        order["expires_at"] = order["expires_at"].isoformat()  # ✅ datetime → ISO 8601 문자열 변환
+
+    return jsonify(orders)
 
 # 카테고리별 정렬 api
 @app.route('/orders/category', methods=["GET"])  
@@ -438,57 +499,64 @@ def select_Orders_by_category():
 @login_required
 def insert_participation_in_orders(order_id):
     userid = g.user_id
-    
+    print(f"🛠 신청하는 주문 ID: {order_id}")  # 디버깅 로그 추가
+
+    try:
+        order_object_id = ObjectId(order_id)  # ✅ ObjectId 변환
+    except:
+        return jsonify({"message": "올바르지 않은 주문 ID입니다."}), 400
+
     # ✅ 유저 정보 조회
     user = db.users.find_one({"_id": ObjectId(userid)}, {"name": 1, "active_order": 1})
     if not user:
         return jsonify({"message": "유저를 찾을 수 없습니다."}), 404
 
-    user_object_id = user["_id"]
-    
-    
-   # ✅ 사용자가 이미 참여 중인 모집이 있는지 확인
-    if user.get("active_order"):
-        active_order = db.orders.find_one({"_id": ObjectId(user["active_order"])}, {"status": 1})
-        
-        # ✅ 모집이 확정되었다면 다른 주문 신청 불가
-        if active_order and active_order["status"] == "confirmed":
-            return jsonify({"message": "참여 중인 모집이 확정되어 새로운 참여 신청이 불가능합니다."}), 400
-        
-        # ✅ 모집이 실패되었다면 새로운 참여 가능 (기존 active_order 초기화)
-        elif active_order and active_order["status"] == "failed":
-            db.users.update_one({"_id": ObjectId(userid)}, {"$unset": {"active_order": ""}})
-
     # ✅ 주문 정보 조회
-    order = db.orders.find_one({"_id": ObjectId(order_id)}, {"participants": 1, "max_participants": 1, "status": 1})
+    order = db.orders.find_one({"_id": order_object_id})
     if not order:
         return jsonify({"message": "주문을 찾을 수 없습니다."}), 404
 
+    # ✅ 참가자 목록 및 최대 인원 확인
+    participants = order.get("participants", [])
+    max_participants = int(order["max_participants"])  # 문자열일 가능성 제거
+    print(f"👥 현재 참가자 수: {len(participants)}/{max_participants}")  # 디버깅 로그 추가
+
     # ✅ 이미 참여한 주문인지 확인
-    if user_object_id in order.get("participants", []):
+    if str(userid) in map(str, participants):
         return jsonify({"message": "이미 신청한 주문입니다."}), 400
 
     # ✅ 주문이 확정된 상태라면 신청 불가
     if order["status"] == "confirmed":
         return jsonify({"message": "해당 주문은 이미 확정되었습니다."}), 400
-    
-# 🔹 참가자 목록 업데이트 (ObjectId 저장)
+
+    # ✅ 참여 가능 여부 확인
+    if len(participants) >= max_participants:
+        return jsonify({"message": "참여 인원이 가득 찼습니다."}), 400
+
+    # ✅ 참가자 목록 업데이트
     db.orders.update_one(
-        {"_id": ObjectId(order_id)},
-        {"$push": {"participants": user_object_id}},
+        {"_id": order_object_id},
+        {
+            "$push": {"participants": ObjectId(userid)},
+            "$set": {"current_participants": len(participants) + 1}  # ✅ 참가자 수 업데이트
+        }
     )
-    
+
     # ✅ 유저의 active_order를 현재 주문 ID로 업데이트
     db.users.update_one(
         {"_id": ObjectId(userid)},
-        {"$set": {"active_order": ObjectId(order_id)}}
+        {"$set": {"active_order": order_object_id}}
     )
-    
-    print("✅ 업데이트 완료")
+
+    # ✅ 디버깅 로그 추가
+    updated_order = db.orders.find_one({"_id": order_object_id}, {"participants": 1})
+    print(f"✅ 업데이트된 참가자 수: {len(updated_order['participants'])}/{max_participants}")
+
     return jsonify({"message": f"{user['name']}님이 주문에 참여했습니다!"}), 200
+
 
 
 
 # 앱 실행
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(debug=True)
