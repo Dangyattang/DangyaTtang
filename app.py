@@ -13,12 +13,14 @@ from dotenv import load_dotenv
 from functools import wraps
 import threading
 import time
+import threading
+import time
 
 
 app = Flask(__name__)
 
 # MongoDB 연결
-client = MongoClient("mongodb://localhost:27017/")
+client = MongoClient('mongodb://test:test@localhost',27017)
 db = client["dangyattang"]
 
 # 비밀키 로드
@@ -69,11 +71,12 @@ def create_access_token(user_id):
 def create_refresh_token(user_id):
     return pyjwt.encode({
         "user_id": user_id,
-        "exp": datetime.utcnow() + timedelta(minutes=15)  # 1분 후 만료
+        "exp": datetime.utcnow() + timedelta(minutes=10)  # 1분 후 만료
     }, SECRET_KEY, algorithm="HS256")
 
 def get_user_from_token():
     access_token = request.cookies.get("access_token")
+    print(f"🔍 Access Token from Cookie: {access_token}")  # ✅ 추가 디버깅용 출력
     print(f"🔍 Access Token from Cookie: {access_token}")  # ✅ 추가 디버깅용 출력
 
     if access_token:
@@ -81,20 +84,25 @@ def get_user_from_token():
             decoded_token = pyjwt.decode(access_token, SECRET_KEY, algorithms=["HS256"])
             user_id = decoded_token.get("user_id")
             print(f"✅ Decoded User ID: {user_id}")  # ✅ 추가 디버깅용 출력
+            print(f"✅ Decoded User ID: {user_id}")  # ✅ 추가 디버깅용 출력
             return db.users.find_one({"_id": ObjectId(user_id)})
         except pyjwt.ExpiredSignatureError:
+            print("[⚠️] Access Token expired. Checking Refresh Token...")  
             print("[⚠️] Access Token expired. Checking Refresh Token...")  
             refresh_token = request.cookies.get("refresh_token")
             if refresh_token:
                 new_access_token = refresh_access_token(refresh_token)
                 if new_access_token:
                     print(f"✅ New Access Token: {new_access_token}")  
+                    print(f"✅ New Access Token: {new_access_token}")  
                     response = make_response()
                     response.set_cookie("access_token", new_access_token, httponly=True, secure=False)
                     return db.users.find_one({"_id": ObjectId(pyjwt.decode(new_access_token, SECRET_KEY, algorithms=["HS256"])["user_id"])})
 
     print("[ERROR] Failed to retrieve user from token")  
+    print("[ERROR] Failed to retrieve user from token")  
     return None
+
 
 
 
@@ -168,11 +176,28 @@ def update_expired_orders():
 
 # 백그라운드 스레드 시작
 threading.Thread(target=update_expired_orders, daemon=True).start()
+
+
+def update_expired_orders():
+    """주기적으로 모집 종료된 주문을 'failed' 상태로 변경"""
+    while True:
+        now = datetime.now()
+        db.orders.update_many(
+            {"expires_at": {"$lt": now}, "status": "active"},
+            {"$set": {"status": "failed"}}
+        )
+        print("[INFO] 모집 종료된 주문 상태 업데이트 완료", datetime.now())
+        time.sleep(30)  # 30초마다 체크
+        
+
+# 백그라운드 스레드 시작
+threading.Thread(target=update_expired_orders, daemon=True).start()
     
 # 야식왕 선정
 def get_top_delivery_user():
     """참여 확정된 주문이 가장 많은 사용자 찾기 (동점자 처리 포함)"""
     users = list(db.users.find({}, {"name": 1, "past_orders": 1}))
+  
   
     if not users:
         return None  # 사용자가 없으면 None 반환
@@ -221,6 +246,10 @@ def login_page():
             response.set_cookie("access_token", access_token, httponly=True, secure=False)
             response.set_cookie("refresh_token", refresh_token, httponly=True, secure=False)
 
+            print(f"✅ 로그인 성공: {username}, 유저 ID: {user['_id']}")
+            print(f"✅ 생성된 Access Token: {access_token}")
+            print(f"✅ 생성된 Refresh Token: {refresh_token}")
+            print(f"✅ 리디렉트 실행됨: {url_for('home')}")
             print(f"✅ 로그인 성공: {username}, 유저 ID: {user['_id']}")
             print(f"✅ 생성된 Access Token: {access_token}")
             print(f"✅ 생성된 Refresh Token: {refresh_token}")
@@ -462,4 +491,4 @@ def insert_participation_in_orders(order_id):
 
 # 앱 실행
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
