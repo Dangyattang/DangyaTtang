@@ -313,18 +313,46 @@ def refresh_token():
         return response
     except pyjwt.ExpiredSignatureError:
         return clear_tokens()
+
+
+    # 사용자 이름을 조회
+@app.route('/user/<user_id>/username', methods=["GET"])
+def get_username(user_id):
+    user = db.users.find_one({"_id": ObjectId(user_id)})
+    if user:
+        return jsonify({"username": user.get("username", ""),"phonenum": user.get("phone", "")})
+    return jsonify({"error": "User not found"}), 404
+# # 사용자 전화번호 조회
+# @app.route('/user/<user_id>/phonenum', methods=["GET"])
+# def get_phonenum(user_id):
+#     user = db.users.find_one({"_id": ObjectId(user_id)})
+#     if user:
+#         return jsonify({"phonenum": user.get("phone", "")})
+#     return jsonify({"error": "User not found"}), 404
 # 이전주문 카드 전체 조회 api
 @app.route('/orders/prev', methods=["GET"])
 def Select_PreviousOrderList():
-    prevorders = list(db.orders.find({"status":"inactive"}).sort("expires_at", -1))
+    user = get_user_from_token()
+    user_id = ObjectId(user["_id"])  # ✅ user의 _id를 ObjectId로 변환
+
+    prevorders = list(db.orders.find({"status":"failed", "participants": {"$in": [user_id]}}).sort("expires_at", -1))
 
     return jsonify([serialize_order(prevorder) for prevorder in prevorders])
 # 진행중인 오더 조회
 @app.route('/order/current', methods=["GET"])
 def select_CurrentOrder():
     user = get_user_from_token()
-    currentorders = list(db.orders.find({"status": "active", "participants": {"$in": [user]}}))
-    return jsonify([serialize_order(order) for order in currentorders])
+
+
+    user_id = ObjectId(user["_id"])  # ✅ user의 _id를 ObjectId로 변환
+
+    # 현재 진행 중인  주문 중, 해당 유저가 참가자로 있는 것 찾기
+    currentorders = db.orders.find({"status": "active", "participants": {"$in": [user_id]}})
+    
+    currentorders_list = list(currentorders)  # Cursor를 리스트로 변환
+    print("현재 진행 중인 주문:", currentorders_list)
+    # return jsonify({"currentorder": [serialize_order(order) for order in currentorders_list]})
+    return jsonify([serialize_order(order) for order in currentorders_list])
 #이전주문에서 전화번호 찾기
 
 @app.route('/order/prev/phonenum', methods=["GET"])
