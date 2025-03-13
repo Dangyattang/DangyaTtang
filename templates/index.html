@@ -18,6 +18,7 @@
 
     <!-- JS -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
 
     <script
       src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"
@@ -91,6 +92,41 @@
         // 페이지 로딩 시 팀 주문 전체 조회
         showOrders();
 
+        var socket = io.connect("http://127.0.0.1:5000/"); // 웹소켓 연결
+        socket.on("connect", function () {
+          console.log("✅ WebSocket 연결 성공!");
+        });
+
+        socket.on("disconnect", function () {
+          console.log("⚠️ WebSocket 연결 끊김!");
+        });
+        // ✅ 주문 상태 변경 이벤트 수신
+        socket.on("order_update", function (data) {
+          console.log("🔔 주문 상태 업데이트 이벤트 수신:", data); // 🔥 로그 추가
+
+          let orderId = data.order_id;
+          let newStatus = data.status;
+
+          console.log(`📢 주문 ID: ${orderId}, 상태: ${newStatus}`); // 🔥 디버깅 로그
+
+          let orderCard = document.getElementById(orderId);
+          if (!orderCard) {
+            console.error(`❌ 주문 ID ${orderId}에 해당하는 카드가 없음.`);
+            return;
+          }
+
+          if (newStatus === "failed") {
+            console.log(`🚨 주문 ${orderId} 모집 마감 이벤트 감지`);
+            orderCard.classList.add("bg-gray-300", "text-gray-500");
+            orderCard.innerHTML += `<div class="text-red-500 font-bold">모집 마감</div>`;
+            alert(`🚨 주문 ${orderId} 모집 마감됨`);
+          } else if (newStatus === "confirmed") {
+            console.log(`✅ 주문 ${orderId} 확정 이벤트 감지`);
+            orderCard.classList.add("bg-green-300", "text-green-800");
+            orderCard.innerHTML += `<div class="text-green-500 font-bold">주문 확정!</div>`;
+            alert(`✅ 주문 ${orderId} 확정되었습니다!`);
+          }
+        });
         // 모달 열기
         $("[data-modal-toggle='crud-modal']").on("click", function () {
           modal.toggleClass("hidden flex");
@@ -218,20 +254,29 @@
             url: `${API_BASE_URL}/orders/category?category=${category}`,
             dataType: "json",
             success: function (data) {
-              $("#OrdersBox").empty(); // 기존 주문 목록 초기화
+              $("#OrdersBox").empty();
 
-              if (data.length === 0) {
+              if (!Array.isArray(data) || data.length === 0) {
+                console.warn(`"${category}" 카테고리에서 주문이 없습니다.`);
                 return;
               }
 
+              let loggedInUserId = "{{ user_id }}"; // 로그인된 사용자 ID 가져오기
+
               for (let order of data) {
+                let isParticipating =
+                  order.participants?.some(
+                    participant => participant === loggedInUserId
+                  ) || false; // ✅ 빈 배열일 경우에도 기본값 false
+
                 makeOrder(
                   order._id,
                   order.food_category,
                   order.menu_details,
                   order.expires_at,
                   order.participants,
-                  order.max_participants
+                  order.max_participants,
+                  isParticipating
                 );
               }
             },
@@ -249,85 +294,86 @@
           menudetail,
           expires_at,
           participations,
-          maxPerson
+          maxPerson,
+          isParticipating
         ) {
           const currentTime = new Date();
-          const expiresTime = new Date(expires_at); // ISO 8601 형식 변환
-          const timeDiff = Math.floor((expiresTime - currentTime) / 60000); // 밀리초 -> 분 변환
+          const expiresTime = new Date(expires_at);
+          const timeDiff = Math.floor((expiresTime - currentTime) / 60000);
           let timeDisplay =
             timeDiff > 0 ? `⏳ 남은 시간 : ${timeDiff}분 전` : "모집 종료";
 
+          let borderClass = isParticipating
+            ? "border-red-500 shadow-md"
+            : "border-gray-200 dark:border-gray-700";
+
           let tempHtml = `
-                  <div
-          id="${orderid}"
-          class="group bg-gray-50 dark:bg-gray-800 rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 hover:border-red-500 hover:shadow-lg transition-transform transform hover:scale-105"
+          <div
+            id="${orderid}"
+            class="group bg-gray-50 dark:bg-gray-800 rounded-md overflow-hidden border ${borderClass} hover:shadow-lg transition-transform transform hover:scale-105"
           >
-          <div class="p-5">
-            <!-- 음식 카테고리 -->
-            <h3 class="text-lg font-semibold text-red-500 dark:text-red-400 group-hover:text-red-600 transition">
-              ${category}
-            </h3>
+            <div class="p-5">
+              <h3 class="text-lg font-semibold text-red-500 dark:text-red-400 group-hover:text-red-600 transition">
+                ${category}
+              </h3>
 
-            <!-- 모집 정보 -->
-            <div class="flex justify-between items-center mt-3">
-              <span class="text-sm text-gray-600 dark:text-gray-300">
-                ${timeDisplay}
-              </span>
-              <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                👥 ${participations.length}/${maxPerson}
-              </span>
-            </div>
+              <div class="flex justify-between items-center mt-3">
+                <span class="text-sm text-gray-600 dark:text-gray-300">
+                  ${timeDisplay}
+                </span>
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  👥 ${participations.length}/${maxPerson}
+                </span>
+              </div>
 
-            <!-- 상세 메뉴 -->
-            <div class="mt-2">
-              <span class="text-xs text-gray-500 dark:text-gray-400">
-                ${menudetail}
-              </span>
-            </div>
+              <div class="mt-2">
+                <span class="text-xs text-gray-500 dark:text-gray-400">
+                  ${menudetail}
+                </span>
+              </div>
 
-            <!-- 참가 버튼 -->
-            <div class="mt-4 flex justify-end">
-              <button class="apply-button px-4 py-2 bg-red-500 text-white font-semibold rounded-full hover:bg-red-600 transition-all">
-                참가
-              </button>
+              <div class="mt-4 flex justify-end">
+                <button class="apply-button px-4 py-2 bg-red-500 text-white font-semibold rounded-full hover:bg-red-600 transition-all"
+                  data-order-id="${orderid}">
+                  ${isParticipating ? "참여중 ✅" : "참가"}
+                </button>
+              </div>
             </div>
           </div>
-          </div>
-          `;
+      `;
+
           $("#OrdersBox").append(tempHtml);
         }
 
         // 팀 참가 신청 request
         $(document).on("click", ".apply-button", function () {
-          // 클릭한 버튼이 속한 주문의 orderid 가져오기
-          let orderId = $(event.target).closest("div[id]").attr("id");
+          let orderId = $(this).data("order-id"); // 데이터 속성에서 가져오기
+          console.log(`🛠 신청하는 주문 ID: ${orderId}`); // 디버깅 로그 추가
+
           if (!orderId) {
             alert("주문 정보를 찾을 수 없습니다.");
             return;
           }
 
-          // 신청 여부 확인
           let confirmApply = confirm("해당 주문에 참가하시겠습니까?");
+          if (!confirmApply) return;
 
-          if (confirmApply) {
-            // AJAX 요청 실행
-            $.ajax({
-              url: `/order/${orderId}`,
-              type: "PUT",
-              data: JSON.stringify({ order_id: orderId }),
-              contentType: "application/json",
-              success: function (response) {
-                alert(response.message); // 서버 응답 메시지 출력
-                showOrders();
-              },
-              error: function (error) {
-                alert("신청 중 오류가 발생했습니다.");
-              },
-            });
-          } else {
-            // 취소한 경우 아무 작업도 하지 않음
-            return;
-          }
+          $.ajax({
+            url: `/order/${orderId}`, // 올바른 order ID가 전송되는지 확인
+            type: "PUT",
+            contentType: "application/json",
+            success: function (response) {
+              alert(response.message);
+              showOrders(); // 주문 목록 새로고침
+            },
+            error: function (error) {
+              console.error("🚨 신청 중 오류 발생:", error);
+              alert(
+                error.responseJSON?.message ||
+                  "참가 신청 중 문제가 발생했습니다."
+              );
+            },
+          });
         });
 
         function showOrders() {
@@ -341,15 +387,40 @@
               // 기존 카드 삭제 후 새로 추가
               ordersContainer.empty();
 
+              let loggedInUserId = "{{ user_id }}"; // 서버에서 받아온 로그인한 유저 ID
+              let activeOrderId = null;
+
               for (let order of data) {
+                // 로그인한 사용자가 참여한 주문인지 확인
+                let isParticipating =
+                  order.participants.includes(loggedInUserId);
+
+                // 참여 중인 주문이 있으면 해당 ID 저장
+                if (isParticipating) {
+                  activeOrderId = order._id;
+                }
+
                 makeOrder(
                   order._id,
                   order.food_category,
                   order.menu_details,
                   order.expires_at,
                   order.participants,
-                  order.max_participants
+                  order.max_participants,
+                  isParticipating
                 );
+              }
+
+              // 만약 사용자가 참여 중인 주문이 있으면 다른 참가 버튼 비활성화
+              if (activeOrderId) {
+                $(".apply-button").each(function () {
+                  if ($(this).data("order-id") !== activeOrderId) {
+                    $(this)
+                      .prop("disabled", true)
+                      .text("참가 불가 ❌")
+                      .addClass("opacity-50");
+                  }
+                });
               }
             },
             error: function (error) {
