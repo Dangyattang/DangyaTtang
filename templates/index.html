@@ -213,7 +213,7 @@
           button.on("click", function () {
             const valueToRemove = $(this).attr("data-value");
             selectedItems = selectedItems.filter(
-              item => item !== valueToRemove
+              (item) => item !== valueToRemove
             );
             $(this).remove();
           });
@@ -800,8 +800,8 @@
           method: "POST",
           credentials: "include",
         })
-          .then(response => response.json())
-          .then(data => {
+          .then((response) => response.json())
+          .then((data) => {
             if (data.access_token) {
               console.log("[DEBUG] 새로운 Access Token 발급 완료");
               document.cookie = `access_token=${data.access_token}; path=/; HttpOnly`;
@@ -809,7 +809,7 @@
               console.error("[ERROR] Access Token 갱신 실패");
             }
           })
-          .catch(error =>
+          .catch((error) =>
             console.error("[ERROR] Refresh Token 요청 실패:", error)
           );
       }
