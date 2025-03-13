@@ -13,6 +13,8 @@ from dotenv import load_dotenv
 from functools import wraps
 import threading
 import time
+import threading
+import time
 
 
 app = Flask(__name__)
@@ -23,7 +25,7 @@ db = client["dangyattang"]
 
 # 비밀키 로드
 load_dotenv()
-SECRET_KEY = os.getenv("SECRET_KEY")
+SECRET_KEY = str(os.getenv("SECRET_KEY"))
 
 def login_required(f):
     """로그인 상태 확인용 데코레이터"""
@@ -69,11 +71,12 @@ def create_access_token(user_id):
 def create_refresh_token(user_id):
     return pyjwt.encode({
         "user_id": user_id,
-        "exp": datetime.utcnow() + timedelta(minutes=15)  # 1분 후 만료
+        "exp": datetime.utcnow() + timedelta(minutes=10)  # 1분 후 만료
     }, SECRET_KEY, algorithm="HS256")
 
 def get_user_from_token():
     access_token = request.cookies.get("access_token")
+    print(f"🔍 Access Token from Cookie: {access_token}")  # ✅ 추가 디버깅용 출력
     print(f"🔍 Access Token from Cookie: {access_token}")  # ✅ 추가 디버깅용 출력
 
     if access_token:
@@ -81,20 +84,25 @@ def get_user_from_token():
             decoded_token = pyjwt.decode(access_token, SECRET_KEY, algorithms=["HS256"])
             user_id = decoded_token.get("user_id")
             print(f"✅ Decoded User ID: {user_id}")  # ✅ 추가 디버깅용 출력
+            print(f"✅ Decoded User ID: {user_id}")  # ✅ 추가 디버깅용 출력
             return db.users.find_one({"_id": ObjectId(user_id)})
         except pyjwt.ExpiredSignatureError:
+            print("[⚠️] Access Token expired. Checking Refresh Token...")  
             print("[⚠️] Access Token expired. Checking Refresh Token...")  
             refresh_token = request.cookies.get("refresh_token")
             if refresh_token:
                 new_access_token = refresh_access_token(refresh_token)
                 if new_access_token:
                     print(f"✅ New Access Token: {new_access_token}")  
+                    print(f"✅ New Access Token: {new_access_token}")  
                     response = make_response()
                     response.set_cookie("access_token", new_access_token, httponly=True, secure=False)
                     return db.users.find_one({"_id": ObjectId(pyjwt.decode(new_access_token, SECRET_KEY, algorithms=["HS256"])["user_id"])})
 
     print("[ERROR] Failed to retrieve user from token")  
+    print("[ERROR] Failed to retrieve user from token")  
     return None
+
 
 
 
@@ -168,11 +176,28 @@ def update_expired_orders():
 
 # 백그라운드 스레드 시작
 threading.Thread(target=update_expired_orders, daemon=True).start()
+
+
+def update_expired_orders():
+    """주기적으로 모집 종료된 주문을 'failed' 상태로 변경"""
+    while True:
+        now = datetime.now()
+        db.orders.update_many(
+            {"expires_at": {"$lt": now}, "status": "active"},
+            {"$set": {"status": "failed"}}
+        )
+        print("[INFO] 모집 종료된 주문 상태 업데이트 완료", datetime.now())
+        time.sleep(30)  # 30초마다 체크
+        
+
+# 백그라운드 스레드 시작
+threading.Thread(target=update_expired_orders, daemon=True).start()
     
 # 야식왕 선정
 def get_top_delivery_user():
     """참여 확정된 주문이 가장 많은 사용자 찾기 (동점자 처리 포함)"""
     users = list(db.users.find({}, {"name": 1, "past_orders": 1}))
+  
   
     if not users:
         return None  # 사용자가 없으면 None 반환
@@ -221,6 +246,10 @@ def login_page():
             response.set_cookie("access_token", access_token, httponly=True, secure=False)
             response.set_cookie("refresh_token", refresh_token, httponly=True, secure=False)
 
+            print(f"✅ 로그인 성공: {username}, 유저 ID: {user['_id']}")
+            print(f"✅ 생성된 Access Token: {access_token}")
+            print(f"✅ 생성된 Refresh Token: {refresh_token}")
+            print(f"✅ 리디렉트 실행됨: {url_for('home')}")
             print(f"✅ 로그인 성공: {username}, 유저 ID: {user['_id']}")
             print(f"✅ 생성된 Access Token: {access_token}")
             print(f"✅ 생성된 Refresh Token: {refresh_token}")
@@ -313,6 +342,53 @@ def refresh_token():
         return response
     except pyjwt.ExpiredSignatureError:
         return clear_tokens()
+
+
+    # 사용자 이름을 조회
+@app.route('/user/<user_id>/username', methods=["GET"])
+def get_username(user_id):
+    user = db.users.find_one({"_id": ObjectId(user_id)})
+    if user:
+        return jsonify({"username": user.get("username", ""),"phonenum": user.get("phone", "")})
+    return jsonify({"error": "User not found"}), 404
+# # 사용자 전화번호 조회
+# @app.route('/user/<user_id>/phonenum', methods=["GET"])
+# def get_phonenum(user_id):
+#     user = db.users.find_one({"_id": ObjectId(user_id)})
+#     if user:
+#         return jsonify({"phonenum": user.get("phone", "")})
+#     return jsonify({"error": "User not found"}), 404
+# 이전주문 카드 전체 조회 api
+@app.route('/orders/prev', methods=["GET"])
+def Select_PreviousOrderList():
+    user = get_user_from_token()
+    user_id = ObjectId(user["_id"])  # ✅ user의 _id를 ObjectId로 변환
+
+    prevorders = list(db.orders.find({"status":"failed", "participants": {"$in": [user_id]}}).sort("expires_at", -1))
+
+    return jsonify([serialize_order(prevorder) for prevorder in prevorders])
+# 진행중인 오더 조회
+@app.route('/order/current', methods=["GET"])
+def select_CurrentOrder():
+    user = get_user_from_token()
+
+
+    user_id = ObjectId(user["_id"])  # ✅ user의 _id를 ObjectId로 변환
+
+    # 현재 진행 중인  주문 중, 해당 유저가 참가자로 있는 것 찾기
+    currentorders = db.orders.find({"status": "active", "participants": {"$in": [user_id]}})
+    
+    currentorders_list = list(currentorders)  # Cursor를 리스트로 변환
+    print("현재 진행 중인 주문:", currentorders_list)
+    # return jsonify({"currentorder": [serialize_order(order) for order in currentorders_list]})
+    return jsonify([serialize_order(order) for order in currentorders_list])
+#이전주문에서 전화번호 찾기
+
+@app.route('/order/prev/phonenum', methods=["GET"])
+def get_phone():
+    username = request.args.get("username") 
+    user = db.users.find_one({"name": username})
+    return jsonify({"phone": user["phone"]})
 
 
 # ===== 팀 주문 api =====
