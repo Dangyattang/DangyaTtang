@@ -13,20 +13,16 @@ from dotenv import load_dotenv
 from functools import wraps
 import threading
 import time
-import threading
-import time
 from flask_socketio import SocketIO
 from flask_cors import CORS
 
-
-
-
 app = Flask(__name__)
+
 CORS(app)  # ✅ CORS 허용
 socketio = SocketIO(app, cors_allowed_origins="*")  # 웹소켓 설정
 
 # MongoDB 연결
-client = MongoClient('mongodb://test:test@localhost',27017)
+client = MongoClient('localhost',27017)
 db = client["dangyattang"]
 
 # 비밀키 로드
@@ -83,29 +79,24 @@ def create_refresh_token(user_id):
 def get_user_from_token():
     access_token = request.cookies.get("access_token")
     print(f"🔍 Access Token from Cookie: {access_token}")  # ✅ 추가 디버깅용 출력
-    print(f"🔍 Access Token from Cookie: {access_token}")  # ✅ 추가 디버깅용 출력
 
     if access_token:
         try:
             decoded_token = pyjwt.decode(access_token, SECRET_KEY, algorithms=["HS256"])
             user_id = decoded_token.get("user_id")
             print(f"✅ Decoded User ID: {user_id}")  # ✅ 추가 디버깅용 출력
-            print(f"✅ Decoded User ID: {user_id}")  # ✅ 추가 디버깅용 출력
             return db.users.find_one({"_id": ObjectId(user_id)})
         except pyjwt.ExpiredSignatureError:
-            print("[⚠️] Access Token expired. Checking Refresh Token...")  
             print("[⚠️] Access Token expired. Checking Refresh Token...")  
             refresh_token = request.cookies.get("refresh_token")
             if refresh_token:
                 new_access_token = refresh_access_token(refresh_token)
                 if new_access_token:
                     print(f"✅ New Access Token: {new_access_token}")  
-                    print(f"✅ New Access Token: {new_access_token}")  
                     response = make_response()
                     response.set_cookie("access_token", new_access_token, httponly=True, secure=False)
                     return db.users.find_one({"_id": ObjectId(pyjwt.decode(new_access_token, SECRET_KEY, algorithms=["HS256"])["user_id"])})
 
-    print("[ERROR] Failed to retrieve user from token")  
     print("[ERROR] Failed to retrieve user from token")  
     return None
 
@@ -179,6 +170,7 @@ def check_and_update_orders():
 
             if expires_at.tzinfo is None:
                 expires_at = expires_at.replace(tzinfo=timezone.utc)
+
             if expires_at < now:  # 🔥 제한시간 마감 시 failed 처리
                 db.orders.update_one({"_id": order["_id"]}, {"$set": {"status": "failed"}})
                 print(f"🚨 주문 {order_id} 모집 마감 (Failed) - 알림 전송 중...")
@@ -239,7 +231,6 @@ def get_top_delivery_user():
     """참여 확정된 주문이 가장 많은 사용자 찾기 (동점자 처리 포함)"""
     users = list(db.users.find({}, {"name": 1, "past_orders": 1}))
   
-  
     if not users:
         return None  # 사용자가 없으면 None 반환
 
@@ -287,10 +278,6 @@ def login_page():
             response.set_cookie("access_token", access_token, httponly=True, secure=False)
             response.set_cookie("refresh_token", refresh_token, httponly=True, secure=False)
 
-            print(f"✅ 로그인 성공: {username}, 유저 ID: {user['_id']}")
-            print(f"✅ 생성된 Access Token: {access_token}")
-            print(f"✅ 생성된 Refresh Token: {refresh_token}")
-            print(f"✅ 리디렉트 실행됨: {url_for('home')}")
             print(f"✅ 로그인 성공: {username}, 유저 ID: {user['_id']}")
             print(f"✅ 생성된 Access Token: {access_token}")
             print(f"✅ 생성된 Refresh Token: {refresh_token}")
@@ -474,8 +461,6 @@ def select_OrderList():
     if not user:
         return jsonify({"error": "로그인 필요"}), 401
 
-    user_id = str(user["_id"])
-
     orders = list(db.orders.find({"status": "active"}).sort("expires_at", -1))
 
     for order in orders:
@@ -553,8 +538,6 @@ def insert_participation_in_orders(order_id):
     print(f"✅ 업데이트된 참가자 수: {len(updated_order['participants'])}/{max_participants}")
 
     return jsonify({"message": f"{user['name']}님이 주문에 참여했습니다!"}), 200
-
-
 
 
 # 앱 실행
