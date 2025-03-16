@@ -13,20 +13,16 @@ from dotenv import load_dotenv
 from functools import wraps
 import threading
 import time
-import threading
-import time
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, join_room
 from flask_cors import CORS
 
-
-
-
 app = Flask(__name__)
+
 CORS(app)  # ✅ CORS 허용
 socketio = SocketIO(app, cors_allowed_origins="*")  # 웹소켓 설정
 
 # MongoDB 연결
-client = MongoClient('mongodb://test:test@localhost',27017)
+client = MongoClient('localhost',27017)
 db = client["dangyattang"]
 
 # 비밀키 로드
@@ -83,29 +79,24 @@ def create_refresh_token(user_id):
 def get_user_from_token():
     access_token = request.cookies.get("access_token")
     print(f"🔍 Access Token from Cookie: {access_token}")  # ✅ 추가 디버깅용 출력
-    print(f"🔍 Access Token from Cookie: {access_token}")  # ✅ 추가 디버깅용 출력
 
     if access_token:
         try:
             decoded_token = pyjwt.decode(access_token, SECRET_KEY, algorithms=["HS256"])
             user_id = decoded_token.get("user_id")
             print(f"✅ Decoded User ID: {user_id}")  # ✅ 추가 디버깅용 출력
-            print(f"✅ Decoded User ID: {user_id}")  # ✅ 추가 디버깅용 출력
             return db.users.find_one({"_id": ObjectId(user_id)})
         except pyjwt.ExpiredSignatureError:
-            print("[⚠️] Access Token expired. Checking Refresh Token...")  
             print("[⚠️] Access Token expired. Checking Refresh Token...")  
             refresh_token = request.cookies.get("refresh_token")
             if refresh_token:
                 new_access_token = refresh_access_token(refresh_token)
                 if new_access_token:
                     print(f"✅ New Access Token: {new_access_token}")  
-                    print(f"✅ New Access Token: {new_access_token}")  
                     response = make_response()
                     response.set_cookie("access_token", new_access_token, httponly=True, secure=False)
                     return db.users.find_one({"_id": ObjectId(pyjwt.decode(new_access_token, SECRET_KEY, algorithms=["HS256"])["user_id"])})
 
-    print("[ERROR] Failed to retrieve user from token")  
     print("[ERROR] Failed to retrieve user from token")  
     return None
 
@@ -175,30 +166,46 @@ def check_and_update_orders():
         orders = db.orders.find({"status": "active"})
         for order in orders:
             order_id = str(order["_id"])
+            foods = " + ".join(order["food_category"])
             expires_at = order["expires_at"]
 
             if expires_at.tzinfo is None:
                 expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+            # Todo = 주문 마감 알림이 해당 주문에 참가한 사람한테만 가게 하기.
+            participants = order["participants"]
+
             if expires_at < now:  # 🔥 제한시간 마감 시 failed 처리
                 db.orders.update_one({"_id": order["_id"]}, {"$set": {"status": "failed"}})
-                print(f"🚨 주문 {order_id} 모집 마감 (Failed) - 알림 전송 중...")
+                print(f"🚨 주문 {foods} 모집 마감 (Failed) - 알림 전송 중...")
                 remove_active_order_from_users(order["participants"], order_id)
-                socketio.emit("order_update", {"order_id": order_id, "status": "failed"})  # 알람 전송
-                print(f"🚨 주문 {order_id} 모집 마감 (Failed)")
+                for user_id in participants:
+                    socketio.emit("order_update", {"order_id": order_id, "status": "failed", "categories": foods}, room=str(user_id))  # 알람 전송
+
+                print(f"🚨 주문 {foods} 모집 마감 (Failed)")
 
             elif len(order["participants"]) >= int(order["max_participants"]):  # 🔥 인원 충족 시 confirmed 처리
                 db.orders.update_one({"_id": order["_id"]}, {"$set": {"status": "confirmed"}})
-                print(f"✅ 주문 {order_id} 확정됨 (Confirmed), 알람 전송")
+                print(f"✅ 주문 {foods} 확정됨 (Confirmed), 알람 전송")
                 remove_active_order_from_users(order["participants"], order_id)
                 add_to_past_orders(order["participants"], order_id)
-
-                socketio.emit("order_update", {"order_id": order_id, "status": "confirmed"})  # 알람 전송
-
+                for user_id in participants:
+                    socketio.emit("order_update", {"order_id": order_id, "status": "confirmed", "categories": foods}, room=str(user_id))  # 알람 전송
+              
+        print("[INFO] socket 송수신 체크", datetime.now())
         time.sleep(10)  # 10초마다 체크
 
 # 🔥 스레드 실행 (앱 시작 시)
 thread = threading.Thread(target=check_and_update_orders, daemon=True)
 thread.start()
+
+@socketio.on("join")
+def on_join(data):
+    """클라이언트가 특정 room(자신의 user_id)에 join하도록 설정"""
+    user_id = data.get("user_id")
+    if user_id:
+        join_room(str(user_id))  # 해당 유저를 user_id를 기반으로 하는 room에 추가
+        print(f"✅ User {user_id} joined room {user_id}")
 
 def remove_active_order_from_users(participants, order_id):
     """주문이 완료되거나 실패했을 때 참가자의 active_order에서 제거"""
@@ -238,7 +245,6 @@ threading.Thread(target=update_expired_orders, daemon=True).start()
 def get_top_delivery_user():
     """참여 확정된 주문이 가장 많은 사용자 찾기 (동점자 처리 포함)"""
     users = list(db.users.find({}, {"name": 1, "past_orders": 1}))
-  
   
     if not users:
         return None  # 사용자가 없으면 None 반환
@@ -287,10 +293,6 @@ def login_page():
             response.set_cookie("access_token", access_token, httponly=True, secure=False)
             response.set_cookie("refresh_token", refresh_token, httponly=True, secure=False)
 
-            print(f"✅ 로그인 성공: {username}, 유저 ID: {user['_id']}")
-            print(f"✅ 생성된 Access Token: {access_token}")
-            print(f"✅ 생성된 Refresh Token: {refresh_token}")
-            print(f"✅ 리디렉트 실행됨: {url_for('home')}")
             print(f"✅ 로그인 성공: {username}, 유저 ID: {user['_id']}")
             print(f"✅ 생성된 Access Token: {access_token}")
             print(f"✅ 생성된 Refresh Token: {refresh_token}")
@@ -424,7 +426,6 @@ def select_CurrentOrder():
     # return jsonify({"currentorder": [serialize_order(order) for order in currentorders_list]})
     return jsonify([serialize_order(order) for order in currentorders_list])
 #이전주문에서 전화번호 찾기
-
 @app.route('/order/prev/phonenum', methods=["GET"])
 def get_phone():
     username = request.args.get("username") 
@@ -473,8 +474,6 @@ def select_OrderList():
 
     if not user:
         return jsonify({"error": "로그인 필요"}), 401
-
-    user_id = str(user["_id"])
 
     orders = list(db.orders.find({"status": "active"}).sort("expires_at", -1))
 
@@ -553,8 +552,6 @@ def insert_participation_in_orders(order_id):
     print(f"✅ 업데이트된 참가자 수: {len(updated_order['participants'])}/{max_participants}")
 
     return jsonify({"message": f"{user['name']}님이 주문에 참여했습니다!"}), 200
-
-
 
 
 # 앱 실행
