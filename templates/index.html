@@ -92,39 +92,47 @@
         // 페이지 로딩 시 팀 주문 전체 조회
         showOrders();
 
-        var socket = io.connect("http://127.0.0.1:5000/"); // 웹소켓 연결
+        var socket = io.connect(`${API_BASE_URL}/`); // 웹소켓 연결
+
+        let loggedInUserId = "{{ user_id }}";
+
         socket.on("connect", function () {
           console.log("✅ WebSocket 연결 성공!");
+          socket.emit("join", { user_id: loggedInUserId });
         });
 
         socket.on("disconnect", function () {
           console.log("⚠️ WebSocket 연결 끊김!");
         });
+
         // ✅ 주문 상태 변경 이벤트 수신
         socket.on("order_update", function (data) {
           console.log("🔔 주문 상태 업데이트 이벤트 수신:", data); // 🔥 로그 추가
 
           let orderId = data.order_id;
           let newStatus = data.status;
+          let foodCategories = data.categories;
 
-          console.log(`📢 주문 ID: ${orderId}, 상태: ${newStatus}`); // 🔥 디버깅 로그
+          console.log(`📢 주문 ID: ${foodCategories}, 상태: ${newStatus}`); // 🔥 디버깅 로그
 
           let orderCard = document.getElementById(orderId);
           if (!orderCard) {
-            console.error(`❌ 주문 ID ${orderId}에 해당하는 카드가 없음.`);
+            console.error(
+              `❌ 주문 ID ${foodCategories}에 해당하는 카드가 없음.`
+            );
             return;
           }
 
           if (newStatus === "failed") {
-            console.log(`🚨 주문 ${orderId} 모집 마감 이벤트 감지`);
+            console.log(`🚨 주문 ${foodCategories} 모집 마감 이벤트 감지`);
             orderCard.classList.add("bg-gray-300", "text-gray-500");
             orderCard.innerHTML += `<div class="text-red-500 font-bold">모집 마감</div>`;
-            alert(`🚨 주문 ${orderId} 모집 마감됨`);
+            alert(`🚨 주문 ${foodCategories} 모집 마감됨`);
           } else if (newStatus === "confirmed") {
-            console.log(`✅ 주문 ${orderId} 확정 이벤트 감지`);
+            console.log(`✅ 주문 ${foodCategories} 확정 이벤트 감지`);
             orderCard.classList.add("bg-green-300", "text-green-800");
             orderCard.innerHTML += `<div class="text-green-500 font-bold">주문 확정!</div>`;
-            alert(`✅ 주문 ${orderId} 확정되었습니다!`);
+            alert(`✅ 주문 ${foodCategories} 확정되었습니다!`);
           }
         });
         // 모달 열기
@@ -266,7 +274,7 @@
               for (let order of data) {
                 let isParticipating =
                   order.participants?.some(
-                    participant => participant === loggedInUserId
+                    (participant) => participant === loggedInUserId
                   ) || false; // ✅ 빈 배열일 경우에도 기본값 false
 
                 makeOrder(

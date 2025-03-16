@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from functools import wraps
 import threading
 import time
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, join_room
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -166,31 +166,46 @@ def check_and_update_orders():
         orders = db.orders.find({"status": "active"})
         for order in orders:
             order_id = str(order["_id"])
+            foods = " + ".join(order["food_category"])
             expires_at = order["expires_at"]
 
             if expires_at.tzinfo is None:
                 expires_at = expires_at.replace(tzinfo=timezone.utc)
 
+            # Todo = 주문 마감 알림이 해당 주문에 참가한 사람한테만 가게 하기.
+            participants = order["participants"]
+
             if expires_at < now:  # 🔥 제한시간 마감 시 failed 처리
                 db.orders.update_one({"_id": order["_id"]}, {"$set": {"status": "failed"}})
-                print(f"🚨 주문 {order_id} 모집 마감 (Failed) - 알림 전송 중...")
+                print(f"🚨 주문 {foods} 모집 마감 (Failed) - 알림 전송 중...")
                 remove_active_order_from_users(order["participants"], order_id)
-                socketio.emit("order_update", {"order_id": order_id, "status": "failed"})  # 알람 전송
-                print(f"🚨 주문 {order_id} 모집 마감 (Failed)")
+                for user_id in participants:
+                    socketio.emit("order_update", {"order_id": order_id, "status": "failed", "categories": foods}, room=str(user_id))  # 알람 전송
+
+                print(f"🚨 주문 {foods} 모집 마감 (Failed)")
 
             elif len(order["participants"]) >= int(order["max_participants"]):  # 🔥 인원 충족 시 confirmed 처리
                 db.orders.update_one({"_id": order["_id"]}, {"$set": {"status": "confirmed"}})
-                print(f"✅ 주문 {order_id} 확정됨 (Confirmed), 알람 전송")
+                print(f"✅ 주문 {foods} 확정됨 (Confirmed), 알람 전송")
                 remove_active_order_from_users(order["participants"], order_id)
                 add_to_past_orders(order["participants"], order_id)
-
-                socketio.emit("order_update", {"order_id": order_id, "status": "confirmed"})  # 알람 전송
-
+                for user_id in participants:
+                    socketio.emit("order_update", {"order_id": order_id, "status": "confirmed", "categories": foods}, room=str(user_id))  # 알람 전송
+              
+        print("[INFO] socket 송수신 체크", datetime.now())
         time.sleep(10)  # 10초마다 체크
 
 # 🔥 스레드 실행 (앱 시작 시)
 thread = threading.Thread(target=check_and_update_orders, daemon=True)
 thread.start()
+
+@socketio.on("join")
+def on_join(data):
+    """클라이언트가 특정 room(자신의 user_id)에 join하도록 설정"""
+    user_id = data.get("user_id")
+    if user_id:
+        join_room(str(user_id))  # 해당 유저를 user_id를 기반으로 하는 room에 추가
+        print(f"✅ User {user_id} joined room {user_id}")
 
 def remove_active_order_from_users(participants, order_id):
     """주문이 완료되거나 실패했을 때 참가자의 active_order에서 제거"""
@@ -411,7 +426,6 @@ def select_CurrentOrder():
     # return jsonify({"currentorder": [serialize_order(order) for order in currentorders_list]})
     return jsonify([serialize_order(order) for order in currentorders_list])
 #이전주문에서 전화번호 찾기
-
 @app.route('/order/prev/phonenum', methods=["GET"])
 def get_phone():
     username = request.args.get("username") 
